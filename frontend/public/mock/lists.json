@@ -1,0 +1,166 @@
+[
+	{
+		"id": "personal-1",
+		"name": "Personal",
+		"archived": false,
+		"tasks": [
+			{
+				"id": "p1",
+				"title": "Meditate for 10 minutes",
+				"completed": true,
+				"points": 1,
+				"createdAt": "2026-03-01T08:50:22Z",
+				"completedAt": "2026-03-01T14:50:22Z"
+			},
+			{
+				"id": "p2",
+				"title": "Call mom",
+				"completed": false,
+				"points": 2,
+				"createdAt": "2026-03-01T09:50:22Z"
+			}
+		]
+	},
+	{
+		"id": "work-1",
+		"name": "Work",
+		"archived": false,
+		"tasks": [
+			{
+				"id": "w1",
+				"title": "Finish Project Alpha proposal",
+				"completed": true,
+				"points": 8,
+				"createdAt": "2026-03-01T08:50:22Z",
+				"completedAt": "2026-03-01T14:50:22Z"
+			},
+			{
+				"id": "w3",
+				"title": "Prepare for Monday meeting",
+				"completed": false,
+				"points": 5,
+				"createdAt": "2026-03-01T10:50:22Z"
+			}
+		]
+	},
+	{
+		"id": "archived-mar-1",
+		"name": "Sprint 1: Quick Wins",
+		"archived": true,
+		"archivedAt": "2026-03-01T15:00:00Z",
+		"tasks": [
+			{
+				"id": "a1-1",
+				"title": "Update README",
+				"completed": true,
+				"points": 1,
+				"createdAt": "2026-03-01T10:00:00Z",
+				"completedAt": "2026-03-01T11:00:00Z"
+			},
+			{
+				"id": "a1-2",
+				"title": "Fix bug in auth flow",
+				"completed": true,
+				"points": 5,
+				"createdAt": "2026-03-01T10:30:00Z",
+				"completedAt": "2026-03-01T14:30:00Z"
+			}
+		]
+	},
+	{
+		"id": "archived-feb-28",
+		"name": "Sprint 0: Foundation",
+		"archived": true,
+		"archivedAt": "2026-02-28T16:00:00Z",
+		"tasks": [
+			{
+				"id": "a2-1",
+				"title": "Setup repository",
+				"completed": true,
+				"points": 3,
+				"createdAt": "2026-02-28T09:00:00Z",
+				"completedAt": "2026-02-28T10:00:00Z"
+			},
+			{
+				"id": "a2-2",
+				"title": "Initial UI components",
+				"completed": true,
+				"points": 8,
+				"createdAt": "2026-02-28T10:00:00Z",
+				"completedAt": "2026-02-28T15:00:00Z"
+			}
+		]
+	},
+	{
+		"id": "archived-feb-27",
+		"name": "Project Beta Docs",
+		"archived": true,
+		"archivedAt": "2026-02-27T17:00:00Z",
+		"tasks": [
+			{
+				"id": "a3-1",
+				"title": "Write API docs",
+				"completed": true,
+				"points": 5,
+				"createdAt": "2026-02-27T08:00:00Z",
+				"completedAt": "2026-02-27T12:00:00Z"
+			},
+			{
+				"id": "a3-2",
+				"title": "Create architecture diagram",
+				"completed": true,
+				"points": 3,
+				"createdAt": "2026-02-27T13:00:00Z",
+				"completedAt": "2026-02-27T16:00:00Z"
+			}
+		]
+	},
+	{
+		"id": "archived-feb-25",
+		"name": "Home Reno Planning",
+		"archived": true,
+		"archivedAt": "2026-02-25T12:00:00Z",
+		"tasks": [
+			{
+				"id": "a4-1",
+				"title": "Call electrician",
+				"completed": true,
+				"points": 1,
+				"createdAt": "2026-02-25T08:00:00Z",
+				"completedAt": "2026-02-25T09:00:00Z"
+			},
+			{
+				"id": "a4-2",
+				"title": "Measure kitchen",
+				"completed": true,
+				"points": 2,
+				"createdAt": "2026-02-25T10:00:00Z",
+				"completedAt": "2026-02-25T11:00:00Z"
+			}
+		]
+	},
+	{
+		"id": "archived-feb-24",
+		"name": "Fitness Goals Feb",
+		"archived": true,
+		"archivedAt": "2026-02-24T20:00:00Z",
+		"tasks": [
+			{
+				"id": "a5-1",
+				"title": "Max deadlift session",
+				"completed": true,
+				"points": 8,
+				"createdAt": "2026-02-24T17:00:00Z",
+				"completedAt": "2026-02-24T19:00:00Z"
+			},
+			{
+				"id": "a5-2",
+				"title": "Prep meals for week",
+				"completed": true,
+				"points": 3,
+				"createdAt": "2026-02-24T18:00:00Z",
+				"completedAt": "2026-02-24T19:30:00Z"
+			}
+		]
+	}
+]

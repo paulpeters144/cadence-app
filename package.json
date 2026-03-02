@@ -1,0 +1,9 @@
+{
+  "name": "cadence-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build:frontend": "pnpm --filter frontend build"
+  }
+}

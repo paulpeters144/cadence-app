@@ -1,0 +1,33 @@
+set shell := ["powershell.exe", "-NoProfile", "-Command"]
+
+# The default recipe lists all available commands
+default:
+    @just --list
+
+# Run the backend server locally
+dev:
+    cargo run
+
+# Build the project in debug mode
+build:
+    cargo build
+
+# Build the project for release
+release:
+    cargo build --release
+
+# Run all tests
+test:
+    cargo test
+
+# Check the code for compilation errors without building
+check:
+    cargo check
+
+# Format the Rust code
+fmt:
+    cargo fmt
+
+# Run clippy to lint the code
+lint:
+    cargo clippy -- -D warnings
