@@ -5,8 +5,11 @@ pub mod error;
 pub mod handlers;
 pub mod manager;
 
-use axum::{Router, routing::post};
-use handlers::{login, register};
+use axum::{
+    Router,
+    routing::{get, post},
+};
+use handlers::user;
 use manager::app_manager::Manager;
 use std::sync::Arc;
 use utoipa::OpenApi;
@@ -16,15 +19,23 @@ pub type AppState = Arc<dyn Manager>;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(login::login, register::register),
-    components(schemas(login::LoginRequest, login::LoginResponse, error::ErrorResponse,))
+    paths(user::login, user::register, user::get_me),
+    components(schemas(
+        user::LoginRequest,
+        user::LoginResponse,
+        user::RegisterRequest,
+        user::RegisterResponse,
+        error::ErrorResponse,
+        domain::user::User // TODO: should not be domain. should be response type
+    ))
 )]
 struct ApiDoc;
 
 pub fn app(state: AppState) -> Router {
     Router::new()
-        .route(login::PATH, post(login::login))
-        .route(register::PATH, post(register::register))
+        .route(user::PATH_LOGIN, post(user::login))
+        .route(user::PATH_REGISTER, post(user::register))
+        .route(user::PATH_ME, get(user::get_me))
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }

@@ -1,11 +1,12 @@
 use crate::access::local_repo::{DalError, DbUserRepository, UserRepository};
 use crate::constants::JWT_EXPIRY_SECONDS;
+use crate::domain::user::User;
 use argon2::{
     Argon2,
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
 };
 use async_trait::async_trait;
-use jsonwebtoken::{EncodingKey, Header, encode};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -17,6 +18,7 @@ pub enum ManagerError {
     DatabaseError,
     TokenError,
     HashingError,
+    UserNotFound,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -29,6 +31,8 @@ struct Claims {
 pub trait Manager: Send + Sync {
     async fn login(&self, username: &str, password: &str) -> Result<String, ManagerError>;
     async fn register(&self, username: &str, password: &str) -> Result<String, ManagerError>;
+    async fn get_user(&self, username: &str) -> Result<User, ManagerError>;
+    fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
 pub struct AppManager {
@@ -114,5 +118,23 @@ impl Manager for AppManager {
             Err(DalError::AlreadyExists) => Err(ManagerError::UserAlreadyExists),
             Err(_) => Err(ManagerError::DatabaseError),
         }
+    }
+
+    async fn get_user(&self, username: &str) -> Result<User, ManagerError> {
+        self.user_repo
+            .get_user_by_username(username)
+            .await
+            .map_err(|_| ManagerError::DatabaseError)?
+            .ok_or(ManagerError::UserNotFound)
+    }
+
+    fn verify_jwt(&self, token: &str) -> Result<String, ManagerError> {
+        decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(self.jwt_secret.as_ref()),
+            &Validation::default(),
+        )
+        .map(|data| data.claims.sub)
+        .map_err(|_| ManagerError::TokenError)
     }
 }
