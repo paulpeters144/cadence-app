@@ -90,15 +90,10 @@ This document outlines the API endpoints and data structures for the Cadence app
 - **Body:**
   ```json
   {
-    "username": "demo_user"
+    "username": "your_username",
   }
   ```
 - **Note:** Returns `401 Unauthorized` if not authenticated. Requires `Authorization: Bearer <access_token>` header.
-
-#### Logout (Planned)
-- **URL:** `POST /api/user/logout`
-- **Response:** `204 No Content`
-- **Note:** Client should discard the `access_token`.
 
 ---
 
@@ -180,3 +175,24 @@ This document outlines the API endpoints and data structures for the Cadence app
    - Use `access_token` for authenticating API requests via the `Authorization: Bearer <token>` header.
    - No refresh tokens are used; users must re-authenticate once the access token expires.
    - Access tokens are signed using `HS256`.
+
+---
+
+## Implementation Status Checklist
+
+### Auth / User
+- [x] `POST /api/user/login`
+- [x] `POST /api/user/register`
+- [x] `GET /api/user/me`
+
+### Lists
+- [ ] `GET /api/lists`
+- [ ] `POST /api/lists`
+- [ ] `PATCH /api/lists/:id`
+- [ ] `DELETE /api/lists/:id`
+
+### Tasks
+- [ ] `POST /api/lists/:listId/tasks`
+- [ ] `PATCH /api/lists/:listId/tasks/:taskId`
+- [ ] `DELETE /api/lists/:listId/tasks/:taskId`
+

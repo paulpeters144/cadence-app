@@ -149,23 +149,3 @@ async fn test_login_validation_errors() {
     let response = app.oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
-
-#[tokio::test]
-async fn test_demo_user_login() {
-    let app = common::setup_app().await;
-
-    let payload = json!({
-        "username": "demo_user",
-        "password": "password123"
-    });
-
-    let req = Request::builder()
-        .method("POST")
-        .uri("/api/user/login")
-        .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
-        .unwrap();
-
-    let response = app.oneshot(req).await.unwrap();
-    assert_eq!(response.status(), StatusCode::OK, "Demo user should be able to login by default");
-}

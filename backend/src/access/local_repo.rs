@@ -62,16 +62,6 @@ impl DbUserRepository {
         .execute(&self.pool)
         .await?;
 
-        // Using a valid argon2 hash for "password123"
-        let demo_password_hash = "$argon2id$v=19$m=19456,t=2,p=1$MmpS4mtt28qceHgV2OWZCg$3GB4vVNyFb2asA1kNUPGlw96imkXtVAtx5jalemz27U";
-
-        sqlx::query("INSERT OR IGNORE INTO users (id, username, password_hash) VALUES (?, ?, ?)")
-            .bind(Uuid::new_v4().to_string())
-            .bind("demo_user")
-            .bind(demo_password_hash)
-            .execute(&self.pool)
-            .await?;
-
         Ok(())
     }
 }
