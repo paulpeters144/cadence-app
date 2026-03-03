@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::access::local_repo::{DbUserRepository, UserRepository};
+use async_trait::async_trait;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -20,7 +20,7 @@ struct Claims {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait Manager: Send + Sync {
-    async fn login(&self, username: &str) -> Result<(String, String), ManagerError>;
+    async fn login(&self, username: &str) -> Result<String, ManagerError>;
 }
 
 pub struct AppManager {
@@ -59,15 +59,15 @@ impl AppManager {
 
 #[async_trait]
 impl Manager for AppManager {
-    async fn login(&self, username: &str) -> Result<(String, String), ManagerError> {
+    async fn login(&self, username: &str) -> Result<String, ManagerError> {
         let user_result = self.user_repo.get_user_by_username(username).await;
 
         match user_result {
             Ok(Some(user)) => {
-                let access_token = Self::create_jwt(&user.username, &self.jwt_secret, 3600)?;
-                let refresh_token = Self::create_jwt(&user.username, &self.jwt_secret, 86400 * 7)?;
+                let expiry = 30 * 24 * 60 * 60; // 30 days
+                let access_token = Self::create_jwt(&user.username, &self.jwt_secret, expiry)?;
 
-                Ok((access_token, refresh_token))
+                Ok(access_token)
             }
             Ok(None) => Err(ManagerError::InvalidCredentials),
             Err(_) => Err(ManagerError::DatabaseError),

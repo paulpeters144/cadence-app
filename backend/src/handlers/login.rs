@@ -19,7 +19,6 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub username: String,
     pub access_token: String,
-    pub refresh_token: String,
 }
 
 pub const PATH: &str = "/api/user/login";
@@ -40,11 +39,10 @@ pub async fn login(
     let result = state.app_manager.login(&payload.username).await;
 
     match result {
-        Ok((access_token, refresh_token)) => {
+        Ok(access_token) => {
             let result = LoginResponse {
                 username: payload.username,
                 access_token,
-                refresh_token,
             };
             Ok(Json(result))
         }
