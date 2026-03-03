@@ -1,12 +1,14 @@
 use axum::{Json, extract::State};
+use axum_valid::Valid;
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::manager::app_manager::{Manager, ManagerError};
 
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct RegisterRequest {
+    #[validate(length(min = 3, message = "Username too short"))]
     pub username: String,
     #[allow(dead_code)]
     pub password: Option<String>,
@@ -19,21 +21,25 @@ pub struct RegisterResponse {
     pub refresh_token: String,
 }
 
+pub const PATH: &str = "/api/user/register";
+
 #[utoipa::path(
     post,
-    path = "/api/user/register",
-    tag = "Register",
+    path = PATH,
+    tag = "User",
     request_body = RegisterRequest,
     responses(
-        (status = 200, description = "Login successful", body = LoginResponse),
-        (status = 400, description = "Bad request", body = crate::error::ErrorResponse),
-        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
-        (status = 500, description = "Internal server error", body = crate::error::ErrorResponse),
+        (status = 200, description = "Registration successful", body = RegisterResponse),
     )
 )]
 pub async fn register(
-    State(state): State<AppState>,
-    Json(payload): Json<LoginRequest>,
-) -> Result<Json<LoginResponse>, AppError> {
-    todo!();
+    State(_state): State<AppState>,
+    Valid(Json(payload)): Valid<Json<RegisterRequest>>,
+) -> Result<Json<RegisterResponse>, AppError> {
+    let response = RegisterResponse {
+        username: payload.username.clone(),
+        access_token: "not_implemented".to_string(),
+        refresh_token: "not_implemented".to_string(),
+    };
+    Ok(Json(response))
 }

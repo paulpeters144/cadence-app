@@ -33,7 +33,7 @@ mod login_test_suite {
 
         let req = Request::builder()
             .method("POST")
-            .uri("/api/login")
+            .uri("/api/user/login")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&json!({
@@ -49,12 +49,109 @@ mod login_test_suite {
     }
 
     #[tokio::test]
+    async fn test_login_username_too_short_returns_bad_request() {
+        let app = setup_app().await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/user/login")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&json!({
+                    "username": "ab",
+                    "password": "password123"
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_login_missing_username_returns_bad_request() {
+        let app = setup_app().await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/user/login")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&json!({
+                    "password": "password123"
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn test_login_malformed_json_returns_bad_request() {
+        let app = setup_app().await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/user/login")
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"username": "demo_user", "password": "password"#))
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_login_missing_password_is_ok() {
+        let app = setup_app().await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/user/login")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&json!({
+                    "username": "demo_user"
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_login_extra_fields_ignored_is_ok() {
+        let app = setup_app().await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/user/login")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&json!({
+                    "username": "demo_user",
+                    "extra": "field"
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn test_login_invalid_credentials_returns_unauthorized() {
         let app = setup_app().await;
 
         let req = Request::builder()
             .method("POST")
-            .uri("/api/login")
+            .uri("/api/user/login")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&json!({
@@ -76,7 +173,7 @@ mod login_test_suite {
         // demo_user is seeded in init()
         let req = Request::builder()
             .method("POST")
-            .uri("/api/login")
+            .uri("/api/user/login")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&json!({

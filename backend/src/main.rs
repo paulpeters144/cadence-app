@@ -14,11 +14,8 @@ async fn main() {
     repo.init().await.expect("Failed to initialize database");
 
     let user_repo = Arc::new(repo);
-
     let app_manager = Arc::new(AppManager::new(user_repo, jwt_secret));
-
     let state = AppState { app_manager };
-
     let router = app(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();

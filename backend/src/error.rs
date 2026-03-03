@@ -5,11 +5,12 @@ use axum::{
 };
 use serde::Serialize;
 
-#[derive(Serialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
     pub message: String,
 }
 
+#[derive(Debug)]
 pub enum AppError {
     BadRequest(String),
     Unauthorized(String),

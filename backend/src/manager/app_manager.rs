@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::access::local_repo::{DbUserRepository, UserRepository};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
@@ -16,11 +17,10 @@ struct Claims {
     exp: usize,
 }
 
+#[cfg_attr(test, mockall::automock)]
+#[async_trait]
 pub trait Manager: Send + Sync {
-    fn login(
-        &self,
-        username: &str,
-    ) -> impl std::future::Future<Output = Result<(String, String), ManagerError>> + Send;
+    async fn login(&self, username: &str) -> Result<(String, String), ManagerError>;
 }
 
 pub struct AppManager {
@@ -57,6 +57,7 @@ impl AppManager {
     }
 }
 
+#[async_trait]
 impl Manager for AppManager {
     async fn login(&self, username: &str) -> Result<(String, String), ManagerError> {
         let user_result = self.user_repo.get_user_by_username(username).await;
