@@ -4,15 +4,15 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::AppState;
-use crate::error::AppError;
+use crate::error::{AppError, ErrorResponse};
 use crate::manager::app_manager::ManagerError;
 
 #[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct LoginRequest {
     #[validate(length(min = 3, message = "Username too short"))]
     pub username: String,
-    #[allow(dead_code)]
-    pub password: Option<String>,
+    #[validate(length(min = 8, message = "Password too short"))]
+    pub password: String,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -29,14 +29,17 @@ pub const PATH: &str = "/api/user/login";
     tag = "User",
     request_body = LoginRequest,
     responses(
-        (status = 200, description = "Login successful", body = LoginResponse, ),
+        (status = 200, description = "Login successful", body = LoginResponse),
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn login(
     State(state): State<AppState>,
     Valid(Json(payload)): Valid<Json<LoginRequest>>,
 ) -> Result<Json<LoginResponse>, AppError> {
-    let result = state.app_manager.login(&payload.username).await;
+    let result = state.app_manager.login(&payload.username, &payload.password).await;
 
     match result {
         Ok(access_token) => {
@@ -51,7 +54,7 @@ pub async fn login(
             let msg = "Invalid credentials".to_string();
             Err(AppError::Unauthorized(msg))
         }
-        Err(ManagerError::DatabaseError) | Err(ManagerError::TokenError) => {
+        Err(_) => {
             let msg = "Internal server error".to_string();
             Err(AppError::InternalServerError(msg))
         }
