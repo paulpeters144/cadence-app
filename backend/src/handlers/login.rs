@@ -5,20 +5,33 @@ use crate::AppState;
 use crate::error::AppError;
 use crate::manager::app_manager::{Manager, ManagerError};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct LoginRequest {
     pub username: String,
     #[allow(dead_code)]
     pub password: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct LoginResponse {
     pub username: String,
     pub access_token: String,
     pub refresh_token: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/user/login",
+    tag = "Login",
+    request_body = LoginRequest,
+    responses(
+        (
+            status = 200, 
+            description = "Login successful", 
+            body = LoginResponse,
+        ),
+    )
+)]
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,

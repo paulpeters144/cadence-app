@@ -7,14 +7,32 @@ pub mod manager;
 use axum::{Router, routing::post};
 use manager::app_manager::AppManager;
 use std::sync::Arc;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Clone)]
 pub struct AppState {
     pub app_manager: Arc<AppManager>,
 }
 
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        handlers::login::login,
+    ),
+    components(
+        schemas(
+            handlers::login::LoginRequest,
+            handlers::login::LoginResponse,
+            error::ErrorResponse,
+        )
+    )
+)]
+struct ApiDoc;
+
 pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/api/login", post(handlers::login::login))
+        .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }

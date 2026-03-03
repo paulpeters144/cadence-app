@@ -7,8 +7,8 @@ use std::sync::Arc;
 async fn main() {
     dotenvy::dotenv().ok();
 
-    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:cadence.db".to_string());
-    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set in environment");
+    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set in the environment");
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not set in the environment");
 
     let repo = DbUserRepository::new(&db_url).await;
     repo.init().await.expect("Failed to initialize database");

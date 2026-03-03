@@ -8,6 +8,10 @@ default:
 dev:
     cargo run
 
+# Run the backend server with auto-reload (requires cargo-watch)
+watch:
+    cargo watch -x run
+
 # Build the project in debug mode
 build:
     cargo build

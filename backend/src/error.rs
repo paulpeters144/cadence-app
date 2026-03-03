@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
     pub message: String,
 }
