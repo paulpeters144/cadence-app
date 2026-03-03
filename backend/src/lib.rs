@@ -12,10 +12,7 @@ use std::sync::Arc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-#[derive(Clone)]
-pub struct AppState {
-    pub app_manager: Arc<dyn Manager>,
-}
+pub type AppState = Arc<dyn Manager>;
 
 #[derive(OpenApi)]
 #[openapi(

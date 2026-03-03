@@ -40,7 +40,6 @@ pub async fn register(
     Valid(Json(payload)): Valid<Json<RegisterRequest>>,
 ) -> Result<Json<RegisterResponse>, AppError> {
     let access_token = state
-        .app_manager
         .register(&payload.username, &payload.password)
         .await
         .map_err(|e| match e {

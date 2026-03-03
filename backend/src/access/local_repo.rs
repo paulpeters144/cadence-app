@@ -126,10 +126,10 @@ impl UserRepository for DbUserRepository {
         match result {
             Ok(_) => Ok(()),
             Err(e) => {
-                if let Some(sqlite_error) = e.as_database_error() {
-                    if sqlite_error.is_unique_violation() {
-                        return Err(DalError::AlreadyExists);
-                    }
+                if let Some(sqlite_error) = e.as_database_error()
+                    && sqlite_error.is_unique_violation()
+                {
+                    return Err(DalError::AlreadyExists);
                 }
                 Err(DalError::DatabaseError(e.to_string()))
             }

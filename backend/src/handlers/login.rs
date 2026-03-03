@@ -39,7 +39,7 @@ pub async fn login(
     State(state): State<AppState>,
     Valid(Json(payload)): Valid<Json<LoginRequest>>,
 ) -> Result<Json<LoginResponse>, AppError> {
-    let result = state.app_manager.login(&payload.username, &payload.password).await;
+    let result = state.login(&payload.username, &payload.password).await;
 
     match result {
         Ok(access_token) => {

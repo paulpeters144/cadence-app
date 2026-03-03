@@ -11,8 +11,6 @@ pub async fn setup_app() -> Router {
 
     let repo = Arc::new(repo);
     let secret = "test_secret".to_string();
-    let app_manager = Arc::new(AppManager::new(repo, secret));
-
-    let state = AppState { app_manager };
+    let state: AppState = Arc::new(AppManager::new(repo, secret));
     app(state)
 }
