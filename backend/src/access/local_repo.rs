@@ -1,10 +1,10 @@
-use crate::domain::user::User;
+use crate::Domain;
 use sqlx::{Row, SqlitePool, sqlite::SqlitePoolOptions};
 use uuid::Uuid;
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub enum DalError {
+pub enum AccessError {
     NotFound,
     AlreadyExists,
     DatabaseError(String),
@@ -14,18 +14,18 @@ pub trait UserRepository: Send + Sync {
     fn get_user_by_username(
         &self,
         username: &str,
-    ) -> impl std::future::Future<Output = Result<Option<User>, DalError>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<Domain::User>, AccessError>> + Send;
 
     fn get_user_by_username_with_hash(
         &self,
         username: &str,
-    ) -> impl std::future::Future<Output = Result<Option<(User, String)>, DalError>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<(Domain::User, String)>, AccessError>> + Send;
 
     fn create_user(
         &self,
         username: &str,
         password_hash: &str,
-    ) -> impl std::future::Future<Output = Result<(), DalError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), AccessError>> + Send;
 }
 
 pub struct DbUserRepository {
@@ -63,8 +63,8 @@ impl DbUserRepository {
         .await?;
 
         // Using a valid argon2 hash for "password123"
-        let demo_password_hash = "$argon2id$v=19$m=19456,t=2,p=1$MmpS4mtt28qceHgV2OWZCg$3GB4vVNyFb2asA1kNUPGlw96imkXtVAtx5jalemz27U"; 
-        
+        let demo_password_hash = "$argon2id$v=19$m=19456,t=2,p=1$MmpS4mtt28qceHgV2OWZCg$3GB4vVNyFb2asA1kNUPGlw96imkXtVAtx5jalemz27U";
+
         sqlx::query("INSERT OR IGNORE INTO users (id, username, password_hash) VALUES (?, ?, ?)")
             .bind(Uuid::new_v4().to_string())
             .bind("demo_user")
@@ -77,15 +77,18 @@ impl DbUserRepository {
 }
 
 impl UserRepository for DbUserRepository {
-    async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, DalError> {
+    async fn get_user_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<Domain::User>, AccessError> {
         let row = sqlx::query("SELECT username FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DalError::DatabaseError(e.to_string()))?;
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
         match row {
-            Some(record) => Ok(Some(User {
+            Some(record) => Ok(Some(Domain::User {
                 username: record.get("username"),
             })),
             None => Ok(None),
@@ -95,16 +98,16 @@ impl UserRepository for DbUserRepository {
     async fn get_user_by_username_with_hash(
         &self,
         username: &str,
-    ) -> Result<Option<(User, String)>, DalError> {
+    ) -> Result<Option<(Domain::User, String)>, AccessError> {
         let row = sqlx::query("SELECT username, password_hash FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DalError::DatabaseError(e.to_string()))?;
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
         match row {
             Some(record) => Ok(Some((
-                User {
+                Domain::User {
                     username: record.get("username"),
                 },
                 record.get("password_hash"),
@@ -113,7 +116,7 @@ impl UserRepository for DbUserRepository {
         }
     }
 
-    async fn create_user(&self, username: &str, password_hash: &str) -> Result<(), DalError> {
+    async fn create_user(&self, username: &str, password_hash: &str) -> Result<(), AccessError> {
         let id = Uuid::new_v4().to_string();
         let result =
             sqlx::query("INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)")
@@ -129,9 +132,9 @@ impl UserRepository for DbUserRepository {
                 if let Some(sqlite_error) = e.as_database_error()
                     && sqlite_error.is_unique_violation()
                 {
-                    return Err(DalError::AlreadyExists);
+                    return Err(AccessError::AlreadyExists);
                 }
-                Err(DalError::DatabaseError(e.to_string()))
+                Err(AccessError::DatabaseError(e.to_string()))
             }
         }
     }

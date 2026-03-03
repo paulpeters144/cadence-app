@@ -1,6 +1,7 @@
 pub mod access;
 pub mod constants;
 pub mod domain;
+pub use domain as Domain;
 pub mod error;
 pub mod handlers;
 pub mod manager;
@@ -25,8 +26,8 @@ pub type AppState = Arc<dyn Manager>;
         user::LoginResponse,
         user::RegisterRequest,
         user::RegisterResponse,
+        user::UserResponse,
         error::ErrorResponse,
-        domain::user::User // TODO: should not be domain. should be response type
     ))
 )]
 struct ApiDoc;

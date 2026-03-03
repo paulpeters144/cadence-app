@@ -1,5 +1,5 @@
 use crate::AppState;
-use crate::domain::user::User;
+use crate::Domain;
 use crate::error::{AppError, ErrorResponse};
 use crate::handlers::util::auth::AuthenticatedUser;
 use crate::manager::app_manager::ManagerError;
@@ -13,12 +13,25 @@ use validator::Validate;
 // -----------------------------------------------------------------------------
 pub const PATH_ME: &str = "/api/user/me";
 
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct UserResponse {
+    pub username: String,
+}
+
+impl From<Domain::User> for UserResponse {
+    fn from(user: Domain::User) -> Self {
+        Self {
+            username: user.username,
+        }
+    }
+}
+
 #[utoipa::path(
     get,
     path = PATH_ME,
     tag = "User",
     responses(
-        (status = 200, description = "Current user retrieved successfully", body = User),
+        (status = 200, description = "Current user retrieved successfully", body = UserResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     security(
@@ -28,7 +41,7 @@ pub const PATH_ME: &str = "/api/user/me";
 pub async fn get_me(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-) -> Result<Json<User>, AppError> {
+) -> Result<Json<UserResponse>, AppError> {
     let user = manager
         .get_user(&auth.username)
         .await
@@ -36,7 +49,7 @@ pub async fn get_me(
             ManagerError::UserNotFound => AppError::Unauthorized("User not found".to_string()),
             _ => AppError::InternalServerError("Failed to fetch user".to_string()),
         })?;
-    Ok(Json(user))
+    Ok(Json(UserResponse::from(user)))
 }
 
 // -----------------------------------------------------------------------------

@@ -1,6 +1,6 @@
-use crate::access::local_repo::{DalError, DbUserRepository, UserRepository};
+use crate::Domain;
+use crate::access::local_repo::{AccessError, DbUserRepository, UserRepository};
 use crate::constants::JWT_EXPIRY_SECONDS;
-use crate::domain::user::User;
 use argon2::{
     Argon2,
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -31,7 +31,7 @@ struct Claims {
 pub trait Manager: Send + Sync {
     async fn login(&self, username: &str, password: &str) -> Result<String, ManagerError>;
     async fn register(&self, username: &str, password: &str) -> Result<String, ManagerError>;
-    async fn get_user(&self, username: &str) -> Result<User, ManagerError>;
+    async fn get_user(&self, username: &str) -> Result<Domain::User, ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
@@ -88,7 +88,10 @@ impl AppManager {
 #[async_trait]
 impl Manager for AppManager {
     async fn login(&self, username: &str, password: &str) -> Result<String, ManagerError> {
-        let user_result = self.user_repo.get_user_by_username_with_hash(username).await;
+        let user_result = self
+            .user_repo
+            .get_user_by_username_with_hash(username)
+            .await;
 
         match user_result {
             Ok(Some((user, hash))) => {
@@ -115,12 +118,12 @@ impl Manager for AppManager {
                     Self::create_jwt(username, &self.jwt_secret, JWT_EXPIRY_SECONDS)?;
                 Ok(access_token)
             }
-            Err(DalError::AlreadyExists) => Err(ManagerError::UserAlreadyExists),
+            Err(AccessError::AlreadyExists) => Err(ManagerError::UserAlreadyExists),
             Err(_) => Err(ManagerError::DatabaseError),
         }
     }
 
-    async fn get_user(&self, username: &str) -> Result<User, ManagerError> {
+    async fn get_user(&self, username: &str) -> Result<Domain::User, ManagerError> {
         self.user_repo
             .get_user_by_username(username)
             .await
