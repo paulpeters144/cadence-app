@@ -82,7 +82,7 @@ pub fn app(state: AppState) -> Router {
             axum::routing::patch(task::update_task).delete(task::delete_task),
         )
         .route(task::PATH_TASKS_REORDER, post(task::reorder_tasks))
-        .route("/api/tasks/{taskId}/move", post(task::move_task))
+        .route(task::PATH_TASK_MOVE, post(task::move_task))
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }

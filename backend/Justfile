@@ -6,11 +6,11 @@ default:
 
 # Run the backend server locally
 dev:
-    cargo run
+    cargo run --bin backend
 
 # Run the backend server with auto-reload (requires cargo-watch)
 watch:
-    cargo watch -x run
+    cargo watch -x "run --bin backend"
 
 # Build the project in debug mode
 build:
@@ -22,7 +22,7 @@ release:
 
 # Run all tests
 test:
-    cargo test
+    cargo nextest run
 
 # Check the code for compilation errors without building
 check:
