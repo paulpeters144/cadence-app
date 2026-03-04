@@ -13,6 +13,7 @@ use validator::Validate;
 pub const PATH_LISTS: &str = "/api/lists";
 pub const PATH_LIST_ID: &str = "/api/lists/{id}";
 pub const PATH_LIST_DUPLICATE: &str = "/api/lists/{id}/duplicate";
+pub const PATH_LISTS_REORDER: &str = "/api/lists/reorder";
 
 // -----------------------------------------------------------------------------
 // SCHEMAS
@@ -31,11 +32,19 @@ pub struct DuplicateListRequest {
 }
 
 #[derive(Deserialize, Validate, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListReorderRequest {
+    pub active_id: Uuid,
+    pub over_id: Uuid,
+}
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct UpdateListRequest {
     #[validate(length(min = 1, message = "Name cannot be empty"))]
     pub name: Option<String>,
     pub journal: Option<String>,
     pub archived: Option<bool>,
+    pub position: Option<f32>,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -46,6 +55,7 @@ pub struct ListResponse {
     pub journal: Option<String>,
     pub archived: bool,
     pub archived_at: Option<DateTime<Utc>>,
+    pub position: f32,
 }
 
 impl From<Domain::List> for ListResponse {
@@ -56,6 +66,7 @@ impl From<Domain::List> for ListResponse {
             journal: list.journal,
             archived: list.archived,
             archived_at: list.archived_at,
+            position: list.position,
         }
     }
 }
@@ -164,6 +175,7 @@ pub async fn update_list(
             payload.name,
             payload.journal,
             payload.archived,
+            payload.position,
         )
         .await
         .map_err(|e| match e {
@@ -174,6 +186,39 @@ pub async fn update_list(
                 AppError::NotFound("User not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to update list".to_string()),
+        })?;
+
+    Ok(Json(ListResponse::from(list)))
+}
+
+#[utoipa::path(
+    post,
+    path = PATH_LISTS_REORDER,
+    tag = "Lists",
+    request_body = ListReorderRequest,
+    responses(
+        (status = 200, description = "Lists reordered successfully", body = ListResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "List not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn reorder_lists(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    Valid(Json(payload)): Valid<Json<ListReorderRequest>>,
+) -> Result<Json<ListResponse>, AppError> {
+    let list = manager
+        .reorder_lists(&auth.username, payload.active_id, payload.over_id)
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::ListNotFound => {
+                AppError::NotFound("List not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to reorder lists".to_string()),
         })?;
 
     Ok(Json(ListResponse::from(list)))

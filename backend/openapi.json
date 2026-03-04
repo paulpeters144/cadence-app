@@ -131,7 +131,130 @@
         ]
       }
     },
+    "/api/lists/reorder": {
+      "post": {
+        "tags": [
+          "Lists"
+        ],
+        "operationId": "reorder_lists",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListReorderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Lists reordered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "List not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          }
+        ]
+      }
+    },
     "/api/lists/{id}": {
+      "delete": {
+        "tags": [
+          "Lists"
+        ],
+        "operationId": "delete_list",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "List ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "List deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "List not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          }
+        ]
+      },
       "patch": {
         "tags": [
           "Lists"
@@ -176,6 +299,83 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "List not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          }
+        ]
+      }
+    },
+    "/api/lists/{id}/duplicate": {
+      "post": {
+        "tags": [
+          "Lists"
+        ],
+        "operationId": "duplicate_list",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "List ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "List duplicated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse"
                 }
               }
             }
@@ -353,6 +553,83 @@
         ]
       }
     },
+    "/api/lists/{listId}/tasks/reorder": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "operationId": "reorder_tasks",
+        "parameters": [
+          {
+            "name": "listId",
+            "in": "path",
+            "description": "List ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskReorderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Tasks reordered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task or List not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          }
+        ]
+      }
+    },
     "/api/lists/{listId}/tasks/{taskId}": {
       "delete": {
         "tags": [
@@ -482,6 +759,83 @@
           },
           "404": {
             "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          }
+        ]
+      }
+    },
+    "/api/tasks/{taskId}/move": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "operationId": "move_task",
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "description": "Task ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Task moved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task or List not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -695,6 +1049,17 @@
           }
         }
       },
+      "DuplicateListRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "ErrorResponse": {
         "type": "object",
         "required": [
@@ -706,12 +1071,30 @@
           }
         }
       },
+      "ListReorderRequest": {
+        "type": "object",
+        "required": [
+          "activeId",
+          "overId"
+        ],
+        "properties": {
+          "activeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "overId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "ListResponse": {
         "type": "object",
         "required": [
           "id",
           "name",
-          "archived"
+          "archived",
+          "position"
         ],
         "properties": {
           "archived": {
@@ -736,6 +1119,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "position": {
+            "type": "number",
+            "format": "float"
           }
         }
       },
@@ -769,6 +1156,30 @@
           }
         }
       },
+      "MoveTaskRequest": {
+        "type": "object",
+        "required": [
+          "fromListId",
+          "toListId"
+        ],
+        "properties": {
+          "fromListId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "toListId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "RegisterRequest": {
         "type": "object",
         "required": [
@@ -799,12 +1210,30 @@
           }
         }
       },
+      "TaskReorderRequest": {
+        "type": "object",
+        "required": [
+          "activeId",
+          "overId"
+        ],
+        "properties": {
+          "activeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "overId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "TaskResponse": {
         "type": "object",
         "required": [
           "id",
           "title",
           "completed",
+          "position",
           "createdAt"
         ],
         "properties": {
@@ -833,6 +1262,10 @@
             ],
             "format": "float"
           },
+          "position": {
+            "type": "number",
+            "format": "float"
+          },
           "title": {
             "type": "string"
           }
@@ -858,6 +1291,13 @@
               "string",
               "null"
             ]
+          },
+          "position": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
           }
         }
       },
@@ -871,6 +1311,13 @@
             ]
           },
           "points": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "position": {
             "type": [
               "number",
               "null"

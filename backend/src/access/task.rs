@@ -301,4 +301,43 @@ impl TaskRepository for AppRepository {
 
         Ok(())
     }
+
+    async fn reorder_tasks(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        active_id: Uuid,
+        over_id: Uuid,
+    ) -> Result<Domain::Task, AccessError> {
+        if active_id == over_id {
+            return self.update_task(username, list_id, active_id, None, None, None, None).await;
+        }
+
+        let tasks = self.get_tasks(username, list_id).await?;
+
+        let old_index = tasks.iter().position(|t| t.id == active_id).ok_or(AccessError::NotFound)?;
+        let new_index = tasks.iter().position(|t| t.id == over_id).ok_or(AccessError::NotFound)?;
+
+        let new_position = if new_index > old_index {
+            // Moving down - place after over_id
+            let over_pos = tasks[new_index].position;
+            if new_index == tasks.len() - 1 {
+                over_pos + 1024.0
+            } else {
+                let next_pos = tasks[new_index + 1].position;
+                (over_pos + next_pos) / 2.0
+            }
+        } else {
+            // Moving up - place before over_id
+            let over_pos = tasks[new_index].position;
+            if new_index == 0 {
+                over_pos / 2.0
+            } else {
+                let prev_pos = tasks[new_index - 1].position;
+                (over_pos + prev_pos) / 2.0
+            }
+        };
+
+        self.update_task(username, list_id, active_id, None, None, None, Some(new_position)).await
+    }
 }

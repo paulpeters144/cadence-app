@@ -29,11 +29,13 @@ pub type AppState = Arc<dyn Manager>;
         list::update_list,
         list::delete_list,
         list::duplicate_list,
+        list::reorder_lists,
         task::create_task,
         task::get_tasks,
         task::update_task,
         task::delete_task,
-        task::move_task
+        task::move_task,
+        task::reorder_tasks
     ),
     components(schemas(
         user::LoginRequest,
@@ -43,9 +45,11 @@ pub type AppState = Arc<dyn Manager>;
         user::UserResponse,
         list::CreateListRequest,
         list::DuplicateListRequest,
+        list::ListReorderRequest,
         list::UpdateListRequest,
         list::ListResponse,
         task::CreateTaskRequest,
+        task::TaskReorderRequest,
         task::UpdateTaskRequest,
         task::MoveTaskRequest,
         task::TaskResponse,
@@ -68,6 +72,7 @@ pub fn app(state: AppState) -> Router {
             axum::routing::patch(list::update_list).delete(list::delete_list),
         )
         .route(list::PATH_LIST_DUPLICATE, post(list::duplicate_list))
+        .route(list::PATH_LISTS_REORDER, post(list::reorder_lists))
         .route(
             task::PATH_TASKS,
             post(task::create_task).get(task::get_tasks),
@@ -76,6 +81,7 @@ pub fn app(state: AppState) -> Router {
             task::PATH_TASK_ID,
             axum::routing::patch(task::update_task).delete(task::delete_task),
         )
+        .route(task::PATH_TASKS_REORDER, post(task::reorder_tasks))
         .route("/api/tasks/{taskId}/move", post(task::move_task))
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)

@@ -105,6 +105,7 @@ impl ListRepository for AppRepository {
         name: Option<String>,
         journal: Option<String>,
         archived: Option<bool>,
+        position: Option<f32>,
     ) -> Result<Domain::List, AccessError> {
         let archived_at = archived.map(|a| if a { Some(chrono::Utc::now()) } else { None });
 
@@ -113,6 +114,7 @@ impl ListRepository for AppRepository {
              SET name = COALESCE(?, name),
                  journal = CASE WHEN ? IS NOT NULL THEN ? ELSE journal END,
                  archived = COALESCE(?, archived),
+                 position = COALESCE(?, position),
                  archived_at = CASE
                     WHEN ? IS NOT NULL THEN ?
                     ELSE archived_at
@@ -124,6 +126,7 @@ impl ListRepository for AppRepository {
         .bind(journal.is_some())
         .bind(journal)
         .bind(archived)
+        .bind(position)
         .bind(archived.is_some())
         .bind(archived_at.flatten().map(|dt| dt.to_rfc3339()))
         .bind(username)
@@ -279,5 +282,75 @@ impl ListRepository for AppRepository {
             archived_at: None,
             position,
         })
+    }
+
+    async fn reorder_lists(
+        &self,
+        username: &str,
+        active_id: Uuid,
+        over_id: Uuid,
+    ) -> Result<Domain::List, AccessError> {
+        if active_id == over_id {
+            let row = sqlx::query(
+                "SELECT id, name, journal, archived, archived_at, position FROM lists WHERE id = ? AND username = ?",
+            )
+            .bind(active_id.to_string())
+            .bind(username)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| match e {
+                sqlx::Error::RowNotFound => AccessError::NotFound,
+                _ => AccessError::DatabaseError(e.to_string()),
+            })?;
+
+            let id_str: String = row.get("id");
+            let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+            let archived_at_str: Option<String> = row.get("archived_at");
+            let archived_at = match archived_at_str {
+                Some(s) => Some(
+                    chrono::DateTime::parse_from_rfc3339(&s)
+                        .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+                        .with_timezone(&chrono::Utc),
+                ),
+                None => None,
+            };
+
+            return Ok(Domain::List {
+                id,
+                name: row.get("name"),
+                journal: row.get("journal"),
+                archived: row.get("archived"),
+                archived_at,
+                position: row.get("position"),
+            });
+        }
+
+        let lists = self.get_lists(username, None, Some(1000)).await?;
+
+        let old_index = lists.iter().position(|l| l.id == active_id).ok_or(AccessError::NotFound)?;
+        let new_index = lists.iter().position(|l| l.id == over_id).ok_or(AccessError::NotFound)?;
+
+        let new_position = if new_index > old_index {
+            // Moving down - place after over_id
+            let over_pos = lists[new_index].position;
+            if new_index == lists.len() - 1 {
+                over_pos + 1024.0
+            } else {
+                let next_pos = lists[new_index + 1].position;
+                (over_pos + next_pos) / 2.0
+            }
+        } else {
+            // Moving up - place before over_id
+            let over_pos = lists[new_index].position;
+            if new_index == 0 {
+                over_pos / 2.0
+            } else {
+                let prev_pos = lists[new_index - 1].position;
+                (over_pos + prev_pos) / 2.0
+            }
+        };
+
+        self.update_list(username, active_id, None, None, None, Some(new_position)).await
     }
 }

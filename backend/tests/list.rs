@@ -361,3 +361,47 @@ async fn test_duplicate_list_unauthorized_owner() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
+#[tokio::test]
+async fn test_reorder_lists_success() {
+    let app = common::setup_app().await;
+    let token = common::register_user(&app, "test_user_reorder").await;
+
+    let list_id1 = common::create_list(&app, &token, "List 1").await;
+    let list_id2 = common::create_list(&app, &token, "List 2").await;
+    let list_id3 = common::create_list(&app, &token, "List 3").await;
+
+    // Initial order: 1, 2, 3
+    // Move 1 to after 2: new order 2, 1, 3
+    let reorder_payload = json!({
+        "activeId": list_id1,
+        "overId": list_id2
+    });
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/lists/reorder")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&reorder_payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify final order
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/lists")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    let lists = body_json.as_array().unwrap();
+    
+    assert_eq!(lists[0]["id"].as_str().unwrap(), list_id2);
+    assert_eq!(lists[1]["id"].as_str().unwrap(), list_id1);
+    assert_eq!(lists[2]["id"].as_str().unwrap(), list_id3);
+}

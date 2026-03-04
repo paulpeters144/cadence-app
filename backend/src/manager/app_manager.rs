@@ -51,6 +51,7 @@ pub trait Manager: Send + Sync {
         name: Option<String>,
         journal: Option<String>,
         archived: Option<bool>,
+        position: Option<f32>,
     ) -> Result<Domain::List, ManagerError>;
     async fn create_task(
         &self,
@@ -95,6 +96,19 @@ pub trait Manager: Send + Sync {
         id: Uuid,
         new_name: &str,
     ) -> Result<Domain::List, ManagerError>;
+    async fn reorder_lists(
+        &self,
+        username: &str,
+        active_id: Uuid,
+        over_id: Uuid,
+    ) -> Result<Domain::List, ManagerError>;
+    async fn reorder_tasks(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        active_id: Uuid,
+        over_id: Uuid,
+    ) -> Result<Domain::Task, ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
@@ -217,9 +231,10 @@ impl Manager for AppManager {
         name: Option<String>,
         journal: Option<String>,
         archived: Option<bool>,
+        position: Option<f32>,
     ) -> Result<Domain::List, ManagerError> {
         self.user_repo
-            .update_list(username, id, name, journal, archived)
+            .update_list(username, id, name, journal, archived, position)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::ListNotFound,
@@ -325,6 +340,37 @@ impl Manager for AppManager {
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::ListNotFound,
+                _ => ManagerError::DatabaseError,
+            })
+    }
+
+    async fn reorder_lists(
+        &self,
+        username: &str,
+        active_id: Uuid,
+        over_id: Uuid,
+    ) -> Result<Domain::List, ManagerError> {
+        self.user_repo
+            .reorder_lists(username, active_id, over_id)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::ListNotFound,
+                _ => ManagerError::DatabaseError,
+            })
+    }
+
+    async fn reorder_tasks(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        active_id: Uuid,
+        over_id: Uuid,
+    ) -> Result<Domain::Task, ManagerError> {
+        self.user_repo
+            .reorder_tasks(username, list_id, active_id, over_id)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::TaskNotFound,
                 _ => ManagerError::DatabaseError,
             })
     }

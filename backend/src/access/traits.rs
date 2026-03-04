@@ -41,6 +41,7 @@ pub trait ListRepository: Send + Sync {
         name: Option<String>,
         journal: Option<String>,
         archived: Option<bool>,
+        position: Option<f32>,
     ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
 
     fn delete_list(
@@ -54,6 +55,13 @@ pub trait ListRepository: Send + Sync {
         username: &str,
         id: Uuid,
         new_name: &str,
+    ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
+
+    fn reorder_lists(
+        &self,
+        username: &str,
+        active_id: Uuid,
+        over_id: Uuid,
     ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
 }
 
@@ -98,4 +106,12 @@ pub trait TaskRepository: Send + Sync {
         list_id: Uuid,
         task_id: Uuid,
     ) -> impl std::future::Future<Output = Result<(), AccessError>> + Send;
+
+    fn reorder_tasks(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        active_id: Uuid,
+        over_id: Uuid,
+    ) -> impl std::future::Future<Output = Result<Domain::Task, AccessError>> + Send;
 }

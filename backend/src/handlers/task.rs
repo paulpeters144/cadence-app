@@ -11,6 +11,7 @@ use validator::Validate;
 
 pub const PATH_TASKS: &str = "/api/lists/{listId}/tasks";
 pub const PATH_TASK_ID: &str = "/api/lists/{listId}/tasks/{taskId}";
+pub const PATH_TASKS_REORDER: &str = "/api/lists/{listId}/tasks/reorder";
 
 // -----------------------------------------------------------------------------
 // SCHEMAS
@@ -21,6 +22,13 @@ pub struct CreateTaskRequest {
     #[validate(length(min = 1, message = "Title cannot be empty"))]
     pub title: String,
     pub points: Option<f32>,
+}
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskReorderRequest {
+    pub active_id: Uuid,
+    pub over_id: Uuid,
 }
 
 #[derive(Deserialize, Validate, utoipa::ToSchema)]
@@ -261,4 +269,44 @@ pub async fn delete_task(
         })?;
 
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/lists/{listId}/tasks/reorder",
+    tag = "Tasks",
+    params(
+        ("listId" = Uuid, Path, description = "List ID")
+    ),
+    request_body = TaskReorderRequest,
+    responses(
+        (status = 200, description = "Tasks reordered successfully", body = TaskResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Task or List not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn reorder_tasks(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(list_id): Path<Uuid>,
+    Valid(Json(payload)): Valid<Json<TaskReorderRequest>>,
+) -> Result<Json<TaskResponse>, AppError> {
+    let task = manager
+        .reorder_tasks(&auth.username, list_id, payload.active_id, payload.over_id)
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::TaskNotFound => {
+                AppError::NotFound("Task not found".to_string())
+            }
+            crate::manager::app_manager::ManagerError::ListNotFound => {
+                AppError::NotFound("List not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to reorder tasks".to_string()),
+        })?;
+
+    Ok(Json(TaskResponse::from(task)))
 }
