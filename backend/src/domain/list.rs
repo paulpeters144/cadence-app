@@ -21,5 +21,4 @@ pub struct List {
     pub journal: Option<String>,
     pub archived: bool,
     pub archived_at: Option<DateTime<Utc>>,
-    pub tasks: Vec<Task>,
 }

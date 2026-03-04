@@ -4,10 +4,10 @@ use crate::error::{AppError, ErrorResponse};
 use crate::handlers::util::auth::AuthenticatedUser;
 use axum::{Json, extract::State};
 use axum_valid::Valid;
-use serde::{Deserialize, Serialize};
-use validator::Validate;
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use validator::Validate;
 
 pub const PATH_LISTS: &str = "/api/lists";
 
@@ -53,7 +53,6 @@ pub struct ListResponse {
     pub journal: Option<String>,
     pub archived: bool,
     pub archived_at: Option<DateTime<Utc>>,
-    pub tasks: Vec<TaskResponse>,
 }
 
 impl From<Domain::List> for ListResponse {
@@ -64,7 +63,6 @@ impl From<Domain::List> for ListResponse {
             journal: list.journal,
             archived: list.archived,
             archived_at: list.archived_at,
-            tasks: list.tasks.into_iter().map(TaskResponse::from).collect(),
         }
     }
 }
@@ -97,7 +95,10 @@ pub async fn create_list(
         .await
         .map_err(|_| AppError::InternalServerError("Failed to create list".to_string()))?;
 
-    Ok((axum::http::StatusCode::CREATED, Json(ListResponse::from(list))))
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(ListResponse::from(list)),
+    ))
 }
 
 #[utoipa::path(

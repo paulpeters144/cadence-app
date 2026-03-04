@@ -3,7 +3,6 @@ use sqlx::{Row, SqlitePool, sqlite::SqlitePoolOptions};
 use uuid::Uuid;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum AccessError {
     NotFound,
     AlreadyExists,
@@ -191,27 +190,31 @@ impl ListRepository for DbUserRepository {
             journal: None,
             archived: false,
             archived_at: None,
-            tasks: vec![],
         })
     }
 
     async fn get_all_lists(&self, username: &str) -> Result<Vec<Domain::List>, AccessError> {
-        let rows = sqlx::query("SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ?")
-            .bind(username)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+        let rows = sqlx::query(
+            "SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ?",
+        )
+        .bind(username)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
         let mut lists = Vec::new();
         for row in rows {
             let id_str: String = row.get("id");
-            let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-            
+            let id =
+                Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
             let archived_at_str: Option<String> = row.get("archived_at");
             let archived_at = match archived_at_str {
-                Some(s) => Some(chrono::DateTime::parse_from_rfc3339(&s)
-                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-                    .with_timezone(&chrono::Utc)),
+                Some(s) => Some(
+                    chrono::DateTime::parse_from_rfc3339(&s)
+                        .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+                        .with_timezone(&chrono::Utc),
+                ),
                 None => None,
             };
 
@@ -221,7 +224,6 @@ impl ListRepository for DbUserRepository {
                 journal: row.get("journal"),
                 archived: row.get("archived"),
                 archived_at,
-                tasks: vec![], // TODO: Fetch tasks
             });
         }
 

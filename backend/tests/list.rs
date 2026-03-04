@@ -54,8 +54,6 @@ async fn test_create_list_success() {
     assert_eq!(body_json["name"], "My New List");
     assert!(body_json.get("id").is_some());
     assert_eq!(body_json["archived"], false);
-    assert!(body_json["tasks"].is_array());
-    assert_eq!(body_json["tasks"].as_array().unwrap().len(), 0);
 }
 
 #[tokio::test]
