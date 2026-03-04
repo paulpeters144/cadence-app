@@ -1,5 +1,5 @@
 use crate::Domain;
-use crate::access::local_repo::{AccessError, DbUserRepository, UserRepository, ListRepository};
+use crate::access::local_repo::{AccessError, DbUserRepository, ListRepository, UserRepository};
 use crate::constants::JWT_EXPIRY_SECONDS;
 use argon2::{
     Argon2,
@@ -10,6 +10,7 @@ use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode}
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Debug, PartialEq)]
 pub enum ManagerError {
@@ -33,7 +34,12 @@ pub trait Manager: Send + Sync {
     async fn register(&self, username: &str, password: &str) -> Result<String, ManagerError>;
     async fn get_user(&self, username: &str) -> Result<Domain::User, ManagerError>;
     async fn create_list(&self, username: &str, name: &str) -> Result<Domain::List, ManagerError>;
-    async fn get_all_lists(&self, username: &str) -> Result<Vec<Domain::List>, ManagerError>;
+    async fn get_all_lists(
+        &self,
+        username: &str,
+        start_id: Option<Uuid>,
+        take: Option<i32>,
+    ) -> Result<Vec<Domain::List>, ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
@@ -140,9 +146,14 @@ impl Manager for AppManager {
             .map_err(|_| ManagerError::DatabaseError)
     }
 
-    async fn get_all_lists(&self, username: &str) -> Result<Vec<Domain::List>, ManagerError> {
+    async fn get_all_lists(
+        &self,
+        username: &str,
+        start_id: Option<Uuid>,
+        take: Option<i32>,
+    ) -> Result<Vec<Domain::List>, ManagerError> {
         self.user_repo
-            .get_all_lists(username)
+            .get_all_lists(username, start_id, take)
             .await
             .map_err(|_| ManagerError::DatabaseError)
     }

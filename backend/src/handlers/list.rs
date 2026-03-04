@@ -2,6 +2,7 @@ use crate::AppState;
 use crate::Domain;
 use crate::error::{AppError, ErrorResponse};
 use crate::handlers::util::auth::AuthenticatedUser;
+use axum::extract::Query;
 use axum::{Json, extract::State};
 use axum_valid::Valid;
 use chrono::{DateTime, Utc};
@@ -101,10 +102,57 @@ pub async fn create_list(
     ))
 }
 
+// #[derive(Deserialize)]
+// pub struct ListQueryParams {
+//     start_id: Option<Uuid>,
+//     take: Option<i32>,
+// }
+//
+// #[utoipa::path(
+//     get,
+//     path = PATH_LISTS,
+//     tag = "Lists",
+//     params(
+//         ("startId" = Option<String>, Query, description = "Starting ID for pagination"),
+//         ("take" = Option<i32>, Query, description = "Number of items to retrieve"),
+//     ),
+//     responses(
+//         (status = 200, description = "Lists retrieved successfully", body = [ListResponse]),
+//         (status = 401, description = "Unauthorized", body = ErrorResponse),
+//         (status = 500, description = "Internal server error", body = ErrorResponse),
+//     ),
+//     security(
+//         ("jwt" = [])
+//     )
+// )]
+// pub async fn get_all_lists(
+//     State(manager): State<AppState>,
+//     auth: AuthenticatedUser,
+//     Query(params): Query<ListQueryParams>,
+// ) -> Result<Json<Vec<ListResponse>>, AppError> {
+//     let lists = manager
+//         .get_all_lists(&auth.username) // currently ignoring the params
+//         .await
+//         .map_err(|_| AppError::InternalServerError("Failed to fetch lists".to_string()))?;
+//
+//     Ok(Json(lists.into_iter().map(ListResponse::from).collect()))
+// }
+
+#[derive(Deserialize, Validate)]
+pub struct ListQueryParams {
+    pub start_id: Option<Uuid>,
+    #[validate(range(max = 500, message = "Cannot take more than 500 lists"))]
+    pub take: Option<i32>,
+}
+
 #[utoipa::path(
     get,
     path = PATH_LISTS,
     tag = "Lists",
+    params(
+        ("startId" = Option<String>, Query, description = "Starting ID for pagination"),
+        ("take" = Option<i32>, Query, description = "Number of items to retrieve"),
+    ),
     responses(
         (status = 200, description = "Lists retrieved successfully", body = [ListResponse]),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
@@ -114,12 +162,14 @@ pub async fn create_list(
         ("jwt" = [])
     )
 )]
-pub async fn get_all_lists(
+pub async fn get_lists(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
+    Valid(Query(params)): Valid<Query<ListQueryParams>>,
 ) -> Result<Json<Vec<ListResponse>>, AppError> {
+    let ListQueryParams { start_id, take } = params;
     let lists = manager
-        .get_all_lists(&auth.username)
+        .get_all_lists(&auth.username, start_id, take)
         .await
         .map_err(|_| AppError::InternalServerError("Failed to fetch lists".to_string()))?;
 
