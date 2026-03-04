@@ -1,6 +1,6 @@
 use crate::Domain;
-use crate::access::local_repo::{
-    AccessError, DbUserRepository, ListRepository, TaskRepository, UserRepository,
+use crate::access::{
+    AccessError, ListRepository, AppRepository, TaskRepository, UserRepository,
 };
 use crate::constants::JWT_EXPIRY_SECONDS;
 use argon2::{
@@ -79,16 +79,17 @@ pub trait Manager: Send + Sync {
         list_id: Uuid,
         task_id: Uuid,
     ) -> Result<(), ManagerError>;
+    async fn delete_list(&self, username: &str, id: Uuid) -> Result<(), ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
 pub struct AppManager {
-    pub user_repo: Arc<DbUserRepository>,
+    pub user_repo: Arc<AppRepository>,
     pub jwt_secret: String,
 }
 
 impl AppManager {
-    pub fn new(user_repo: Arc<DbUserRepository>, jwt_secret: String) -> Self {
+    pub fn new(user_repo: Arc<AppRepository>, jwt_secret: String) -> Self {
         Self {
             user_repo,
             jwt_secret,
@@ -269,6 +270,15 @@ impl Manager for AppManager {
                 AccessError::NotFound => ManagerError::TaskNotFound,
                 _ => ManagerError::DatabaseError,
             })
+    }
+
+    async fn delete_list(&self, username: &str, id: Uuid) -> Result<(), ManagerError> {
+        self.user_repo.delete_list(username, id).await.map_err(|e| {
+            match e {
+                AccessError::NotFound => ManagerError::ListNotFound,
+                _ => ManagerError::DatabaseError,
+            }
+        })
     }
 
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError> {

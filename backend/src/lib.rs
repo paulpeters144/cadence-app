@@ -27,6 +27,7 @@ pub type AppState = Arc<dyn Manager>;
         list::create_list,
         list::get_lists,
         list::update_list,
+        list::delete_list,
         task::create_task,
         task::get_tasks,
         task::update_task,
@@ -58,7 +59,10 @@ pub fn app(state: AppState) -> Router {
             list::PATH_LISTS,
             post(list::create_list).get(list::get_lists),
         )
-        .route(list::PATH_LIST_ID, axum::routing::patch(list::update_list))
+        .route(
+            list::PATH_LIST_ID,
+            axum::routing::patch(list::update_list).delete(list::delete_list),
+        )
         .route(
             task::PATH_TASKS,
             post(task::create_task).get(task::get_tasks),

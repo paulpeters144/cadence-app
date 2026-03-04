@@ -1,5 +1,5 @@
 use axum::Router;
-use backend::access::local_repo::DbUserRepository;
+use backend::access::AppRepository;
 use backend::manager::app_manager::AppManager;
 use backend::{AppState, app};
 use std::sync::Arc;
@@ -15,7 +15,7 @@ async fn main() {
         let jwt_secret =
             std::env::var("JWT_SECRET").expect("JWT_SECRET not set in the environment");
 
-        let repo = DbUserRepository::new(&db_url).await;
+        let repo = AppRepository::new(&db_url).await;
         repo.init().await.expect("Failed to initialize database");
 
         let user_repo = Arc::new(repo);

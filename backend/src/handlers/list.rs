@@ -171,3 +171,38 @@ pub async fn update_list(
 
     Ok(Json(ListResponse::from(list)))
 }
+
+#[utoipa::path(
+    delete,
+    path = PATH_LIST_ID,
+    tag = "Lists",
+    params(
+        ("id" = Uuid, Path, description = "List ID")
+    ),
+    responses(
+        (status = 204, description = "List deleted successfully"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "List not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn delete_list(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+) -> Result<axum::http::StatusCode, AppError> {
+    manager
+        .delete_list(&auth.username, id)
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::ListNotFound => {
+                AppError::NotFound("List not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to delete list".to_string()),
+        })?;
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
