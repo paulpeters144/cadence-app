@@ -1,0 +1,26 @@
+meta {
+  name: list-create
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{url}}/api/lists
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+body:json {
+  {
+    "name": "My New List"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

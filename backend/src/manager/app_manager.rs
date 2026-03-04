@@ -1,5 +1,5 @@
 use crate::Domain;
-use crate::access::local_repo::{AccessError, DbUserRepository, UserRepository};
+use crate::access::local_repo::{AccessError, DbUserRepository, UserRepository, ListRepository};
 use crate::constants::JWT_EXPIRY_SECONDS;
 use argon2::{
     Argon2,
@@ -32,6 +32,8 @@ pub trait Manager: Send + Sync {
     async fn login(&self, username: &str, password: &str) -> Result<String, ManagerError>;
     async fn register(&self, username: &str, password: &str) -> Result<String, ManagerError>;
     async fn get_user(&self, username: &str) -> Result<Domain::User, ManagerError>;
+    async fn create_list(&self, username: &str, name: &str) -> Result<Domain::List, ManagerError>;
+    async fn get_all_lists(&self, username: &str) -> Result<Vec<Domain::List>, ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
@@ -129,6 +131,20 @@ impl Manager for AppManager {
             .await
             .map_err(|_| ManagerError::DatabaseError)?
             .ok_or(ManagerError::UserNotFound)
+    }
+
+    async fn create_list(&self, username: &str, name: &str) -> Result<Domain::List, ManagerError> {
+        self.user_repo
+            .create_list(username, name)
+            .await
+            .map_err(|_| ManagerError::DatabaseError)
+    }
+
+    async fn get_all_lists(&self, username: &str) -> Result<Vec<Domain::List>, ManagerError> {
+        self.user_repo
+            .get_all_lists(username)
+            .await
+            .map_err(|_| ManagerError::DatabaseError)
     }
 
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError> {

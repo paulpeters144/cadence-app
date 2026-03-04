@@ -1,0 +1,138 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
+use http_body_util::BodyExt;
+use serde_json::{Value, json};
+use tower::ServiceExt;
+
+mod common;
+
+async fn register_user(app: &axum::Router, username: &str) -> String {
+    let payload = json!({
+        "username": username,
+        "password": "password123"
+    });
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/user/register")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    body_json["access_token"].as_str().unwrap().to_string()
+}
+
+#[tokio::test]
+async fn test_create_list_success() {
+    let app = common::setup_app().await;
+    let token = register_user(&app, "test_user").await;
+
+    let payload = json!({
+        "name": "My New List"
+    });
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/lists")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body_json["name"], "My New List");
+    assert!(body_json.get("id").is_some());
+    assert_eq!(body_json["archived"], false);
+    assert!(body_json["tasks"].is_array());
+    assert_eq!(body_json["tasks"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_create_list_unauthorized() {
+    let app = common::setup_app().await;
+
+    let payload = json!({
+        "name": "My New List"
+    });
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/lists")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_create_list_validation_empty_name() {
+    let app = common::setup_app().await;
+    let token = register_user(&app, "test_user").await;
+
+    let payload = json!({
+        "name": ""
+    });
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/lists")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_get_all_lists_success() {
+    let app = common::setup_app().await;
+    let token = register_user(&app, "test_user").await;
+
+    // Create two lists
+    for name in ["List 1", "List 2"] {
+        let payload = json!({ "name": name });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/lists")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {}", token))
+            .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+            .unwrap();
+        let response = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    // Get all lists
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/lists")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    assert!(body_json.is_array());
+    let lists = body_json.as_array().unwrap();
+    assert_eq!(lists.len(), 2);
+    assert!(lists.iter().any(|l| l["name"] == "List 1"));
+    assert!(lists.iter().any(|l| l["name"] == "List 2"));
+}

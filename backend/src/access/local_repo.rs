@@ -28,6 +28,19 @@ pub trait UserRepository: Send + Sync {
     ) -> impl std::future::Future<Output = Result<(), AccessError>> + Send;
 }
 
+pub trait ListRepository: Send + Sync {
+    fn create_list(
+        &self,
+        username: &str,
+        name: &str,
+    ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
+
+    fn get_all_lists(
+        &self,
+        username: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Domain::List>, AccessError>> + Send;
+}
+
 pub struct DbUserRepository {
     pool: SqlitePool,
 }
@@ -57,6 +70,35 @@ impl DbUserRepository {
                 id TEXT PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL COLLATE NOCASE,
                 password_hash TEXT NOT NULL
+            );",
+        )
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS lists (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                name TEXT NOT NULL,
+                journal TEXT,
+                archived BOOLEAN NOT NULL DEFAULT 0,
+                archived_at TEXT,
+                FOREIGN KEY(username) REFERENCES users(username)
+            );",
+        )
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                list_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                completed BOOLEAN NOT NULL DEFAULT 0,
+                points REAL,
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                FOREIGN KEY(list_id) REFERENCES lists(id)
             );",
         )
         .execute(&self.pool)
@@ -127,5 +169,62 @@ impl UserRepository for DbUserRepository {
                 Err(AccessError::DatabaseError(e.to_string()))
             }
         }
+    }
+}
+
+impl ListRepository for DbUserRepository {
+    async fn create_list(&self, username: &str, name: &str) -> Result<Domain::List, AccessError> {
+        let id = Uuid::new_v4();
+        let id_str = id.to_string();
+
+        sqlx::query("INSERT INTO lists (id, username, name) VALUES (?, ?, ?)")
+            .bind(id_str)
+            .bind(username)
+            .bind(name)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        Ok(Domain::List {
+            id,
+            name: name.to_string(),
+            journal: None,
+            archived: false,
+            archived_at: None,
+            tasks: vec![],
+        })
+    }
+
+    async fn get_all_lists(&self, username: &str) -> Result<Vec<Domain::List>, AccessError> {
+        let rows = sqlx::query("SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ?")
+            .bind(username)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        let mut lists = Vec::new();
+        for row in rows {
+            let id_str: String = row.get("id");
+            let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+            
+            let archived_at_str: Option<String> = row.get("archived_at");
+            let archived_at = match archived_at_str {
+                Some(s) => Some(chrono::DateTime::parse_from_rfc3339(&s)
+                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+                    .with_timezone(&chrono::Utc)),
+                None => None,
+            };
+
+            lists.push(Domain::List {
+                id,
+                name: row.get("name"),
+                journal: row.get("journal"),
+                archived: row.get("archived"),
+                archived_at,
+                tasks: vec![], // TODO: Fetch tasks
+            });
+        }
+
+        Ok(lists)
     }
 }

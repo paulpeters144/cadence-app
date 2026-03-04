@@ -186,8 +186,8 @@ This document outlines the API endpoints and data structures for the Cadence app
 - [x] `GET /api/user/me`
 
 ### Lists
-- [ ] `GET /api/lists`
-- [ ] `POST /api/lists`
+- [x] `GET /api/lists`
+- [x] `POST /api/lists`
 - [ ] `PATCH /api/lists/:id`
 - [ ] `DELETE /api/lists/:id`
 
