@@ -129,6 +129,23 @@ async fn test_get_lists_pagination_take() {
 }
 
 #[tokio::test]
+async fn test_get_lists_pagination_take_validation() {
+    let app = common::setup_app().await;
+    let token = common::register_user(&app, "test_user_take_val").await;
+
+    // take > 500 should fail validation
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/lists?take=501")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn test_get_lists_pagination_start_id() {
     let app = common::setup_app().await;
     let token = common::register_user(&app, "test_user_start_id").await;
@@ -175,6 +192,39 @@ async fn test_update_list_success() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let body_json: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(body_json["name"], "Updated Name");
+}
+
+#[tokio::test]
+async fn test_update_list_full() {
+    let app = common::setup_app().await;
+    let token = common::register_user(&app, "test_user_update_full").await;
+
+    let list_id = common::create_list(&app, &token, "Original Name").await;
+
+    // Update all fields
+    let update_payload = json!({
+        "name": "New Name",
+        "journal": "Some notes",
+        "archived": true,
+        "position": 123.45
+    });
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(format!("/api/lists/{}", list_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&update_payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body_json["name"], "New Name");
+    assert_eq!(body_json["journal"], "Some notes");
+    assert_eq!(body_json["archived"], true);
+    assert_eq!(body_json["position"], 123.45);
+    assert!(body_json.get("archivedAt").is_some());
 }
 
 #[tokio::test]
@@ -336,6 +386,25 @@ async fn test_duplicate_list_success() {
     assert_eq!(tasks.len(), 2);
     assert_eq!(tasks[0]["title"], "Task 1");
     assert_eq!(tasks[1]["title"], "Task 2");
+}
+
+#[tokio::test]
+async fn test_duplicate_list_validation_empty_name() {
+    let app = common::setup_app().await;
+    let token = common::register_user(&app, "test_user_dup_val").await;
+    let list_id = common::create_list(&app, &token, "Original List").await;
+
+    let duplicate_payload = json!({ "name": "" });
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/lists/{}/duplicate", list_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&duplicate_payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

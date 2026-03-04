@@ -61,6 +61,28 @@ async fn test_task_lifecycle() {
     let response = app.clone().oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
+    // 3.5 Update Task Full
+    let payload = json!({
+        "title": "Updated Title",
+        "points": 10.5,
+        "position": 999.0
+    });
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(format!("/api/lists/{}/tasks/{}", list_id, task_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let updated_task: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(updated_task["title"], "Updated Title");
+    assert_eq!(updated_task["points"], 10.5);
+    assert_eq!(updated_task["position"], 999.0);
+
     // 4. Delete Task
     let req = Request::builder()
         .method("DELETE")
@@ -296,4 +318,36 @@ async fn test_move_task() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let tasks: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(tasks.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_move_task_security_isolation() {
+    let app = common::setup_app().await;
+    
+    // User 1 has a list and a task
+    let token1 = common::register_user(&app, "user1_move").await;
+    let list_id1 = common::create_list(&app, &token1, "User 1 List").await;
+    let task_id1 = common::create_task(&app, &token1, &list_id1, "Task 1").await;
+    
+    // User 2 has their own list
+    let token2 = common::register_user(&app, "user2_move").await;
+    let list_id2 = common::create_list(&app, &token2, "User 2 List").await;
+
+    // User 2 tries to move User 1's task into User 2's list
+    let move_payload = json!({
+        "fromListId": list_id1,
+        "toListId": list_id2,
+        "position": 1.0
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/tasks/{}/move", task_id1))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token2))
+        .body(Body::from(serde_json::to_vec(&move_payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    // Should be NOT_FOUND because the manager should check if the task belongs to the user
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
