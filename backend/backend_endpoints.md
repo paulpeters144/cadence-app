@@ -90,23 +90,6 @@ This document outlines the current API endpoints and data structures implemented
   }
   ```
 
-#### Refresh Token (Coming Soon)
-- **URL:** `POST /api/user/refresh`
-- **Request Body:**
-  ```json
-  {
-    "refresh_token": "string"
-  }
-  ```
-- **Response:** `200 OK`
-- **Body:**
-  ```json
-  {
-    "access_token": "string",
-    "refresh_token": "string"
-  }
-  ```
-
 ---
 
 ### Lists
@@ -159,7 +142,7 @@ This document outlines the current API endpoints and data structures implemented
 - **URL:** `DELETE /api/lists/:id`
 - **Response:** `204 No Content`
 
-#### Duplicate List (Coming Soon)
+#### Duplicate List
 - **URL:** `POST /api/lists/:id/duplicate`
 - **Request Body:**
   ```json
@@ -170,7 +153,7 @@ This document outlines the current API endpoints and data structures implemented
 - **Response:** `201 Created`
 - **Body:** `List` object (newly created duplicate).
 
-#### Reorder Lists (Coming Soon)
+#### Reorder Lists
 - **URL:** `POST /api/lists/reorder`
 - **Request Body:**
   ```json
@@ -236,7 +219,7 @@ This document outlines the current API endpoints and data structures implemented
 - **Response:** `200 OK`
 - **Body:** Updated `Task` object.
 
-#### Reorder Tasks within a List (Coming Soon)
+#### Reorder Tasks within a List
 - **URL:** `POST /api/lists/:listId/tasks/reorder`
 - **Request Body:**
   ```json
@@ -281,8 +264,6 @@ This document outlines the current API endpoints and data structures implemented
 - [x] Update Task (`PATCH /api/lists/:listId/tasks/:taskId`)
 - [x] Delete Task (`DELETE /api/lists/:listId/tasks/:taskId`)
 - [x] Move Task to Another List (`POST /api/tasks/:taskId/move`)
-
-### Pending
-- [ ] Duplicate List (`POST /api/lists/:id/duplicate`)
-- [ ] Reorder Lists (`POST /api/lists/reorder`)
-- [ ] Reorder Tasks within a List (`POST /api/lists/:listId/tasks/reorder`)
+- [x] Duplicate List (`POST /api/lists/:id/duplicate`)
+- [x] Reorder Lists (`POST /api/lists/reorder`)
+- [x] Reorder Tasks within a List (`POST /api/lists/:listId/tasks/reorder`)
