@@ -20,6 +20,7 @@ pub enum ManagerError {
     TokenError,
     HashingError,
     UserNotFound,
+    ListNotFound,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -34,12 +35,20 @@ pub trait Manager: Send + Sync {
     async fn register(&self, username: &str, password: &str) -> Result<String, ManagerError>;
     async fn get_user(&self, username: &str) -> Result<Domain::User, ManagerError>;
     async fn create_list(&self, username: &str, name: &str) -> Result<Domain::List, ManagerError>;
-    async fn get_all_lists(
+    async fn get_lists(
         &self,
         username: &str,
         start_id: Option<Uuid>,
         take: Option<i32>,
     ) -> Result<Vec<Domain::List>, ManagerError>;
+    async fn update_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        name: Option<String>,
+        journal: Option<String>,
+        archived: Option<bool>,
+    ) -> Result<Domain::List, ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
@@ -96,17 +105,14 @@ impl AppManager {
 #[async_trait]
 impl Manager for AppManager {
     async fn login(&self, username: &str, password: &str) -> Result<String, ManagerError> {
-        let user_result = self
-            .user_repo
-            .get_user_by_username_with_hash(username)
-            .await;
+        let user_result = self.user_repo.get_user_pwd_hash(username).await;
 
         match user_result {
-            Ok(Some((user, hash))) => {
+            Ok(Some(hash)) => {
                 Self::verify_password(password, &hash)?;
 
                 let access_token =
-                    Self::create_jwt(&user.username, &self.jwt_secret, JWT_EXPIRY_SECONDS)?;
+                    Self::create_jwt(username, &self.jwt_secret, JWT_EXPIRY_SECONDS)?;
 
                 Ok(access_token)
             }
@@ -146,16 +152,33 @@ impl Manager for AppManager {
             .map_err(|_| ManagerError::DatabaseError)
     }
 
-    async fn get_all_lists(
+    async fn get_lists(
         &self,
         username: &str,
         start_id: Option<Uuid>,
         take: Option<i32>,
     ) -> Result<Vec<Domain::List>, ManagerError> {
         self.user_repo
-            .get_all_lists(username, start_id, take)
+            .get_lists(username, start_id, take)
             .await
             .map_err(|_| ManagerError::DatabaseError)
+    }
+
+    async fn update_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        name: Option<String>,
+        journal: Option<String>,
+        archived: Option<bool>,
+    ) -> Result<Domain::List, ManagerError> {
+        self.user_repo
+            .update_list(username, id, name, journal, archived)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::ListNotFound,
+                _ => ManagerError::DatabaseError,
+            })
     }
 
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError> {

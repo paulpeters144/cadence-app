@@ -1,9 +1,9 @@
+use crate::AppState;
+use crate::error::AppError;
 use axum::{
     extract::FromRequestParts,
     http::{header::AUTHORIZATION, request::Parts},
 };
-use crate::AppState;
-use crate::error::AppError;
 
 pub struct AuthenticatedUser {
     pub username: String,

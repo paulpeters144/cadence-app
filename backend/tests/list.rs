@@ -97,7 +97,7 @@ async fn test_create_list_validation_empty_name() {
 }
 
 #[tokio::test]
-async fn test_get_all_lists_success() {
+async fn test_get_lists_success() {
     let app = common::setup_app().await;
     let token = register_user(&app, "test_user").await;
 
@@ -199,11 +199,124 @@ async fn test_get_lists_pagination_start_id() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let body_json: Value = serde_json::from_slice(&body).unwrap();
     let lists = body_json.as_array().unwrap();
-    
+
     // Based on current backend implementation, start_id returns exactly one list (the matched id)
     assert_eq!(lists.len(), 1);
     assert_eq!(lists[0]["id"].as_str().unwrap(), target_id);
     assert_eq!(lists[0]["name"].as_str().unwrap(), "Target List");
+}
+
+#[tokio::test]
+async fn test_update_list_success() {
+    let app = common::setup_app().await;
+    let token = register_user(&app, "test_user_update").await;
+
+    // 1. Create a list
+    let payload = json!({ "name": "Original Name" });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/lists")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+    let create_res = app.clone().oneshot(req).await.unwrap();
+    let create_body = create_res.into_body().collect().await.unwrap().to_bytes();
+    let create_json: Value = serde_json::from_slice(&create_body).unwrap();
+    let list_id = create_json["id"].as_str().unwrap();
+
+    // 2. Update the list (partial: name only)
+    let update_payload = json!({ "name": "Updated Name" });
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(format!("/api/lists/{}", list_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&update_payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body_json["name"], "Updated Name");
+    assert_eq!(body_json["archived"], false);
+    assert!(body_json["journal"].is_null());
+
+    // 3. Update the list (full: journal and archive)
+    let update_payload = json!({
+        "journal": "My notes",
+        "archived": true
+    });
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(format!("/api/lists/{}", list_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&update_payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body_json["name"], "Updated Name");
+    assert_eq!(body_json["journal"], "My notes");
+    assert_eq!(body_json["archived"], true);
+    assert!(body_json["archivedAt"].is_string());
+
+    // 4. Unarchive
+    let update_payload = json!({ "archived": false });
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(format!("/api/lists/{}", list_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&update_payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body_json["archived"], false);
+    assert!(body_json["archivedAt"].is_null());
+}
+
+#[tokio::test]
+async fn test_update_list_not_found() {
+    let app = common::setup_app().await;
+    let token = register_user(&app, "test_user_nf").await;
+    let random_id = uuid::Uuid::new_v4();
+
+    let update_payload = json!({ "name": "New Name" });
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(format!("/api/lists/{}", random_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&update_payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_update_list_unauthorized() {
+    let app = common::setup_app().await;
+    let list_id = uuid::Uuid::new_v4();
+
+    let update_payload = json!({ "name": "New Name" });
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(format!("/api/lists/{}", list_id))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&update_payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]

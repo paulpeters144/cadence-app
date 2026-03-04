@@ -25,7 +25,8 @@ pub type AppState = Arc<dyn Manager>;
         user::register,
         user::get_me,
         list::create_list,
-        list::get_lists
+        list::get_lists,
+        list::update_list
     ),
     components(schemas(
         user::LoginRequest,
@@ -34,6 +35,7 @@ pub type AppState = Arc<dyn Manager>;
         user::RegisterResponse,
         user::UserResponse,
         list::CreateListRequest,
+        list::UpdateListRequest,
         list::ListResponse,
         list::TaskResponse,
         error::ErrorResponse,
@@ -50,6 +52,7 @@ pub fn app(state: AppState) -> Router {
             list::PATH_LISTS,
             post(list::create_list).get(list::get_lists),
         )
+        .route("/api/lists/{id}", axum::routing::patch(list::update_list))
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }

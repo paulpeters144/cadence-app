@@ -22,6 +22,14 @@ pub struct CreateListRequest {
     pub name: String,
 }
 
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+pub struct UpdateListRequest {
+    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    pub name: Option<String>,
+    pub journal: Option<String>,
+    pub archived: Option<bool>,
+}
+
 #[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponse {
@@ -102,42 +110,6 @@ pub async fn create_list(
     ))
 }
 
-// #[derive(Deserialize)]
-// pub struct ListQueryParams {
-//     start_id: Option<Uuid>,
-//     take: Option<i32>,
-// }
-//
-// #[utoipa::path(
-//     get,
-//     path = PATH_LISTS,
-//     tag = "Lists",
-//     params(
-//         ("startId" = Option<String>, Query, description = "Starting ID for pagination"),
-//         ("take" = Option<i32>, Query, description = "Number of items to retrieve"),
-//     ),
-//     responses(
-//         (status = 200, description = "Lists retrieved successfully", body = [ListResponse]),
-//         (status = 401, description = "Unauthorized", body = ErrorResponse),
-//         (status = 500, description = "Internal server error", body = ErrorResponse),
-//     ),
-//     security(
-//         ("jwt" = [])
-//     )
-// )]
-// pub async fn get_all_lists(
-//     State(manager): State<AppState>,
-//     auth: AuthenticatedUser,
-//     Query(params): Query<ListQueryParams>,
-// ) -> Result<Json<Vec<ListResponse>>, AppError> {
-//     let lists = manager
-//         .get_all_lists(&auth.username) // currently ignoring the params
-//         .await
-//         .map_err(|_| AppError::InternalServerError("Failed to fetch lists".to_string()))?;
-//
-//     Ok(Json(lists.into_iter().map(ListResponse::from).collect()))
-// }
-
 #[derive(Deserialize, Validate)]
 pub struct ListQueryParams {
     pub start_id: Option<Uuid>,
@@ -169,9 +141,56 @@ pub async fn get_lists(
 ) -> Result<Json<Vec<ListResponse>>, AppError> {
     let ListQueryParams { start_id, take } = params;
     let lists = manager
-        .get_all_lists(&auth.username, start_id, take)
+        .get_lists(&auth.username, start_id, take)
         .await
         .map_err(|_| AppError::InternalServerError("Failed to fetch lists".to_string()))?;
 
     Ok(Json(lists.into_iter().map(ListResponse::from).collect()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/lists/{id}",
+    tag = "Lists",
+    params(
+        ("id" = Uuid, Path, description = "List ID")
+    ),
+    request_body = UpdateListRequest,
+    responses(
+        (status = 200, description = "List updated successfully", body = ListResponse),
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "List not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn update_list(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+    Valid(Json(payload)): Valid<Json<UpdateListRequest>>,
+) -> Result<Json<ListResponse>, AppError> {
+    let list = manager
+        .update_list(
+            &auth.username,
+            id,
+            payload.name,
+            payload.journal,
+            payload.archived,
+        )
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::ListNotFound => {
+                AppError::NotFound("List not found".to_string())
+            }
+            crate::manager::app_manager::ManagerError::UserNotFound => {
+                AppError::NotFound("User not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to update list".to_string()),
+        })?;
+
+    Ok(Json(ListResponse::from(list)))
 }

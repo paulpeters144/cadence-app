@@ -110,7 +110,11 @@ async fn test_login_case_insensitive() {
         .unwrap();
 
     let response = app.oneshot(req).await.unwrap();
-    assert_eq!(response.status(), StatusCode::OK, "Login should be case-insensitive");
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "Login should be case-insensitive"
+    );
 }
 
 #[tokio::test]

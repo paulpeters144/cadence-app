@@ -15,10 +15,10 @@ pub trait UserRepository: Send + Sync {
         username: &str,
     ) -> impl std::future::Future<Output = Result<Option<Domain::User>, AccessError>> + Send;
 
-    fn get_user_by_username_with_hash(
+    fn get_user_pwd_hash(
         &self,
         username: &str,
-    ) -> impl std::future::Future<Output = Result<Option<(Domain::User, String)>, AccessError>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<String>, AccessError>> + Send;
 
     fn create_user(
         &self,
@@ -34,12 +34,21 @@ pub trait ListRepository: Send + Sync {
         name: &str,
     ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
 
-    fn get_all_lists(
+    fn get_lists(
         &self,
         username: &str,
         start_id: Option<Uuid>,
         take: Option<i32>,
     ) -> impl std::future::Future<Output = Result<Vec<Domain::List>, AccessError>> + Send;
+
+    fn update_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        name: Option<String>,
+        journal: Option<String>,
+        archived: Option<bool>,
+    ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
 }
 
 pub struct DbUserRepository {
@@ -128,23 +137,15 @@ impl UserRepository for DbUserRepository {
         }
     }
 
-    async fn get_user_by_username_with_hash(
-        &self,
-        username: &str,
-    ) -> Result<Option<(Domain::User, String)>, AccessError> {
-        let row = sqlx::query("SELECT username, password_hash FROM users WHERE username = ?")
+    async fn get_user_pwd_hash(&self, username: &str) -> Result<Option<String>, AccessError> {
+        let row = sqlx::query("SELECT password_hash FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(&self.pool)
             .await
             .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
         match row {
-            Some(record) => Ok(Some((
-                Domain::User {
-                    username: record.get("username"),
-                },
-                record.get("password_hash"),
-            ))),
+            Some(record) => Ok(Some(record.get("password_hash"))),
             None => Ok(None),
         }
     }
@@ -195,7 +196,7 @@ impl ListRepository for DbUserRepository {
         })
     }
 
-    async fn get_all_lists(
+    async fn get_lists(
         &self,
         username: &str,
         start_id: Option<Uuid>,
@@ -252,5 +253,63 @@ impl ListRepository for DbUserRepository {
         }
 
         Ok(lists)
+    }
+
+    async fn update_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        name: Option<String>,
+        journal: Option<String>,
+        archived: Option<bool>,
+    ) -> Result<Domain::List, AccessError> {
+        let archived_at = archived.map(|a| if a { Some(chrono::Utc::now()) } else { None });
+
+        let row = sqlx::query(
+            "UPDATE lists
+             SET name = COALESCE(?, name),
+                 journal = CASE WHEN ? IS NOT NULL THEN ? ELSE journal END,
+                 archived = COALESCE(?, archived),
+                 archived_at = CASE
+                    WHEN ? IS NOT NULL THEN ?
+                    ELSE archived_at
+                 END
+             WHERE username = ? AND id = ?
+             RETURNING id, name, journal, archived, archived_at",
+        )
+        .bind(name)
+        .bind(journal.is_some()) // Using a flag for journal because COALESCE(?, journal) would not allow setting it to NULL if we wanted to (but here journal is Option<String> and we might want to clear it)
+        .bind(journal)
+        .bind(archived)
+        .bind(archived.is_some())
+        .bind(archived_at.flatten().map(|dt| dt.to_rfc3339()))
+        .bind(username)
+        .bind(id.to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        let row = row.ok_or(AccessError::NotFound)?;
+
+        let id_str: String = row.get("id");
+        let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        let archived_at_str: Option<String> = row.get("archived_at");
+        let archived_at = match archived_at_str {
+            Some(s) => Some(
+                chrono::DateTime::parse_from_rfc3339(&s)
+                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+                    .with_timezone(&chrono::Utc),
+            ),
+            None => None,
+        };
+
+        Ok(Domain::List {
+            id,
+            name: row.get("name"),
+            journal: row.get("journal"),
+            archived: row.get("archived"),
+            archived_at,
+        })
     }
 }
