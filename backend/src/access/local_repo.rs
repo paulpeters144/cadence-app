@@ -1,5 +1,5 @@
 use crate::Domain;
-use sqlx::{Execute, Row, SqlitePool, sqlite::SqlitePoolOptions};
+use sqlx::{Row, SqlitePool, sqlite::SqlitePoolOptions};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -201,53 +201,27 @@ impl ListRepository for DbUserRepository {
         start_id: Option<Uuid>,
         take: Option<i32>,
     ) -> Result<Vec<Domain::List>, AccessError> {
-        let mut query = sqlx::query(
-            "SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ?",
-        );
+        let take = take.unwrap_or(50);
+        let sql = if start_id.is_some() {
+            format!(
+                "SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ? AND id = ? LIMIT {}",
+                take
+            )
+        } else {
+            format!(
+                "SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ? LIMIT {}",
+                take
+            )
+        };
+
+        let mut query = sqlx::query(&sql);
         query = query.bind(username);
 
         if let Some(start_id) = start_id {
-            query = sqlx::query(
-                "SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ? AND id = ?",
-            );
-            query = query.bind(username);
             query = query.bind(start_id.to_string());
         }
-        let take = take.unwrap_or(50);
-        query = sqlx::query(&format!("{} LIMIT {}", query.sql(), take));
 
         let rows = query
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-        let mut lists = Vec::new();
-        for row in rows {
-            let id_str: String = row.get("id");
-            let id =
-                Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-            let archived_at_str: Option<String> = row.get("archived_at");
-            let archived_at = match archived_at_str {
-                Some(s) => Some(
-                    chrono::DateTime::parse_from_rfc3339(&s)
-                        .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-                        .with_timezone(&chrono::Utc),
-                ),
-                None => None,
-            };
-
-            lists.push(Domain::List {
-                id,
-                name: row.get("name"),
-                journal: row.get("journal"),
-                archived: row.get("archived"),
-                archived_at,
-            });
-        }
-
-        Ok(lists)
-            .bind(username)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| AccessError::DatabaseError(e.to_string()))?;

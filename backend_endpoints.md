@@ -1,6 +1,6 @@
 # Backend API Documentation
 
-This document outlines the required API endpoints and data structures needed to replace the current mock API in the Cadence application.
+This document outlines the current API endpoints and data structures implemented in the Cadence backend.
 
 ## Data Models
 
@@ -17,7 +17,7 @@ This document outlines the required API endpoints and data structures needed to 
   "id": "uuid",
   "title": "string",
   "completed": "boolean",
-  "points": "0.5 | 1 | 2 | 3 | 5 | 8 (optional)",
+  "points": "number (optional)",
   "createdAt": "ISO8601 string",
   "completedAt": "ISO8601 string (optional)"
 }
@@ -29,11 +29,11 @@ This document outlines the required API endpoints and data structures needed to 
   "id": "uuid",
   "name": "string",
   "journal": "string (optional)",
-  "archived": "boolean (optional)",
-  "archivedAt": "ISO8601 string (optional)",
-  "tasks": "Task[]"
+  "archived": "boolean",
+  "archivedAt": "ISO8601 string (optional)"
 }
 ```
+*Note: `tasks` are not currently returned as part of the list object.*
 
 ---
 
@@ -42,7 +42,7 @@ This document outlines the required API endpoints and data structures needed to 
 ### Auth / User
 
 #### Get Current User
-- **URL:** `GET /api/user`
+- **URL:** `GET /api/user/me`
 - **Response:** `200 OK`
 - **Body:**
   ```json
@@ -50,31 +50,46 @@ This document outlines the required API endpoints and data structures needed to 
     "username": "demo_user"
   }
   ```
-- **Note:** Returns `null` or `401` if not authenticated. Requires `Authorization: Bearer <access_token>` header.
+- **Note:** Requires `Authorization: Bearer <access_token>` header.
 
 #### Login
-- **URL:** `POST /api/login`
+- **URL:** `POST /api/user/login`
 - **Request Body:**
   ```json
   {
     "username": "string",
-    "password": "string (optional)"
+    "password": "string"
   }
   ```
 - **Response:** `200 OK`
 - **Body:** 
   ```json
   {
-    "user": {
-      "username": "string"
-    },
-    "access_token": "string",
-    "refresh_token": "string"
+    "username": "string",
+    "access_token": "string"
   }
   ```
 
-#### Refresh Token
-- **URL:** `POST /api/refresh`
+#### Register
+- **URL:** `POST /api/user/register`
+- **Request Body:**
+  ```json
+  {
+    "username": "string",
+    "password": "string"
+  }
+  ```
+- **Response:** `200 OK`
+- **Body:** 
+  ```json
+  {
+    "username": "string",
+    "access_token": "string"
+  }
+  ```
+
+#### Refresh Token (Coming Soon)
+- **URL:** `POST /api/user/refresh`
 - **Request Body:**
   ```json
   {
@@ -90,8 +105,8 @@ This document outlines the required API endpoints and data structures needed to 
   }
   ```
 
-#### Logout
-- **URL:** `POST /api/logout`
+#### Logout (Coming Soon)
+- **URL:** `POST /api/user/logout`
 - **Response:** `204 No Content`
 - **Note:** Should invalidate the refresh token on the backend.
 
@@ -101,17 +116,20 @@ This document outlines the required API endpoints and data structures needed to 
 
 #### Get All Lists
 - **URL:** `GET /api/lists`
+- **Query Parameters:**
+  - `start_id`: `uuid` (optional) - For pagination
+  - `take`: `number` (optional, max 500) - For pagination
 - **Response:** `200 OK`
 - **Body:** `List[]`
 - **Example Response:**
   ```json
   [
     {
-      "id": "personal-1",
+      "id": "550e8400-e29b-41d4-a716-446655440000",
       "name": "Personal",
       "journal": "Notes about personal goals...",
       "archived": false,
-      "tasks": [ ... ]
+      "archivedAt": null
     }
   ]
   ```
@@ -127,7 +145,7 @@ This document outlines the required API endpoints and data structures needed to 
 - **Response:** `201 Created`
 - **Body:** `List` object (newly created).
 
-#### Update List (Rename / Archive / Journal)
+#### Update List (Coming Soon)
 - **URL:** `PATCH /api/lists/:id`
 - **Request Body:**
   ```json
@@ -141,11 +159,11 @@ This document outlines the required API endpoints and data structures needed to 
 - **Response:** `200 OK`
 - **Body:** Updated `List` object.
 
-#### Delete List
+#### Delete List (Coming Soon)
 - **URL:** `DELETE /api/lists/:id`
 - **Response:** `204 No Content`
 
-#### Duplicate List
+#### Duplicate List (Coming Soon)
 - **URL:** `POST /api/lists/:id/duplicate`
 - **Request Body:**
   ```json
@@ -156,7 +174,7 @@ This document outlines the required API endpoints and data structures needed to 
 - **Response:** `201 Created`
 - **Body:** `List` object (newly created duplicate).
 
-#### Reorder Lists
+#### Reorder Lists (Coming Soon)
 - **URL:** `POST /api/lists/reorder`
 - **Request Body:**
   ```json
@@ -170,7 +188,15 @@ This document outlines the required API endpoints and data structures needed to 
 
 ---
 
-### Tasks
+### Tasks (Coming Soon)
+
+#### Get Tasks for a List
+- **URL:** `GET /api/lists/:listId/tasks`
+- **Query Parameters:**
+  - `start_id`: `uuid` (optional) - For pagination
+  - `take`: `number` (optional, max 500) - For pagination
+- **Response:** `200 OK`
+- **Body:** `Task[]`
 
 #### Create Task
 - **URL:** `POST /api/lists/:listId/tasks`
@@ -227,10 +253,16 @@ This document outlines the required API endpoints and data structures needed to 
 
 ## Implementation Notes
 
-1. **IDs:** The frontend currently uses `crypto.randomUUID()` for temporary IDs. The backend should generate permanent UUIDs.
+1. **IDs:** The backend generates permanent UUIDs for all objects.
 2. **Timestamps:** Use ISO8601 format for all dates (e.g., `2026-03-01T08:50:22Z`).
-3. **Persistence:** The current app resets on every page reload (except what's in `mockDB` memory). A real backend must persist these changes to a database.
-4. **Auth:** The application should use JWT (JSON Web Tokens) for authentication.
+3. **Persistence:** Data is persisted to a SQLite database.
+4. **Auth:** The application uses JWT (JSON Web Tokens) for authentication.
    - Use `access_token` for authenticating API requests via the `Authorization: Bearer <token>` header.
-   - Use `refresh_token` to obtain a new `access_token` when it expires.
-   - Store tokens securely on the frontend (e.g., HTTP-only cookies or secure storage).
+   - Currently, a single `access_token` is returned upon login/registration. Refresh tokens are planned but not yet implemented.
+5. **CORS:** Ensure CORS is configured correctly for the frontend to communicate with the backend.
+6. **Error Responses:** Standard error response structure:
+   ```json
+   {
+     "error": "Error message description"
+   }
+   ```

@@ -10,7 +10,7 @@ use axum::{
     Router,
     routing::{get, post},
 };
-use handlers::{user, list};
+use handlers::{list, user};
 use manager::app_manager::Manager;
 use std::sync::Arc;
 use utoipa::OpenApi;
@@ -20,7 +20,13 @@ pub type AppState = Arc<dyn Manager>;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(user::login, user::register, user::get_me, list::create_list, list::get_all_lists),
+    paths(
+        user::login,
+        user::register,
+        user::get_me,
+        list::create_list,
+        list::get_lists
+    ),
     components(schemas(
         user::LoginRequest,
         user::LoginResponse,
@@ -40,7 +46,10 @@ pub fn app(state: AppState) -> Router {
         .route(user::PATH_LOGIN, post(user::login))
         .route(user::PATH_REGISTER, post(user::register))
         .route(user::PATH_ME, get(user::get_me))
-        .route(list::PATH_LISTS, post(list::create_list).get(list::get_all_lists))
+        .route(
+            list::PATH_LISTS,
+            post(list::create_list).get(list::get_lists),
+        )
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }
