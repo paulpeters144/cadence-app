@@ -1,0 +1,24 @@
+{
+  "name": "infra",
+  "version": "0.1.0",
+  "bin": {
+    "infra": "bin/infra.js"
+  },
+  "scripts": {
+    "cdk:diff:uat": "cdk diff -c stage=uat",
+    "cdk:deploy:uat": "cdk deploy -c stage=uat",
+    "cdk:diff:prod": "cdk diff -c stage=production",
+    "cdk:deploy:prod": "cdk deploy -c stage=production"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.170.0",
+    "constructs": "^10.4.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "aws-cdk": "2.170.0",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.3.3"
+  }
+}

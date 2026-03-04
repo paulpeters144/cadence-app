@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",
-    "build:frontend": "pnpm --filter frontend build"
+    "build:frontend": "pnpm --filter frontend build",
+    "cdk:diff:uat": "pnpm --filter infra cdk:diff:uat",
+    "cdk:deploy:uat": "pnpm --filter infra cdk:deploy:uat"
   }
 }
