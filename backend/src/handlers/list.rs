@@ -10,42 +10,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-pub const PATH_LISTS: &str = "/api/lists";
-pub const PATH_LIST_ID: &str = "/api/lists/{id}";
-pub const PATH_LIST_DUPLICATE: &str = "/api/lists/{id}/duplicate";
-pub const PATH_LISTS_REORDER: &str = "/api/lists/reorder";
-
 // -----------------------------------------------------------------------------
-// SCHEMAS
+// RESPONSE SCHEMAS (SHARED)
 // -----------------------------------------------------------------------------
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-pub struct CreateListRequest {
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
-    pub name: String,
-}
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-pub struct DuplicateListRequest {
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
-    pub name: String,
-}
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ListReorderRequest {
-    pub active_id: Uuid,
-    pub over_id: Uuid,
-}
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-pub struct UpdateListRequest {
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
-    pub name: Option<String>,
-    pub journal: Option<String>,
-    pub archived: Option<bool>,
-    pub position: Option<f32>,
-}
 
 #[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -72,38 +39,9 @@ impl From<Domain::List> for ListResponse {
 }
 
 // -----------------------------------------------------------------------------
-// HANDLERS
+// GET ALL LISTS
 // -----------------------------------------------------------------------------
-
-#[utoipa::path(
-    post,
-    path = PATH_LISTS,
-    tag = "Lists",
-    request_body = CreateListRequest,
-    responses(
-        (status = 201, description = "List created successfully", body = ListResponse),
-        (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 500, description = "Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("jwt" = [])
-    )
-)]
-pub async fn create_list(
-    State(manager): State<AppState>,
-    auth: AuthenticatedUser,
-    Valid(Json(payload)): Valid<Json<CreateListRequest>>,
-) -> Result<(axum::http::StatusCode, Json<ListResponse>), AppError> {
-    let list = manager
-        .create_list(&auth.username, &payload.name)
-        .await
-        .map_err(|_| AppError::InternalServerError("Failed to create list".to_string()))?;
-
-    Ok((
-        axum::http::StatusCode::CREATED,
-        Json(ListResponse::from(list)),
-    ))
-}
+pub const PATH_LISTS: &str = "/api/lists";
 
 #[derive(Deserialize, Validate)]
 pub struct ListQueryParams {
@@ -141,6 +79,60 @@ pub async fn get_lists(
         .map_err(|_| AppError::InternalServerError("Failed to fetch lists".to_string()))?;
 
     Ok(Json(lists.into_iter().map(ListResponse::from).collect()))
+}
+
+// -----------------------------------------------------------------------------
+// CREATE LIST
+// -----------------------------------------------------------------------------
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+pub struct CreateListRequest {
+    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    pub name: String,
+}
+
+#[utoipa::path(
+    post,
+    path = PATH_LISTS,
+    tag = "Lists",
+    request_body = CreateListRequest,
+    responses(
+        (status = 201, description = "List created successfully", body = ListResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn create_list(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    Valid(Json(payload)): Valid<Json<CreateListRequest>>,
+) -> Result<(axum::http::StatusCode, Json<ListResponse>), AppError> {
+    let list = manager
+        .create_list(&auth.username, &payload.name)
+        .await
+        .map_err(|_| AppError::InternalServerError("Failed to create list".to_string()))?;
+
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(ListResponse::from(list)),
+    ))
+}
+
+// -----------------------------------------------------------------------------
+// UPDATE LIST
+// -----------------------------------------------------------------------------
+pub const PATH_LIST_ID: &str = "/api/lists/{id}";
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+pub struct UpdateListRequest {
+    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    pub name: Option<String>,
+    pub journal: Option<String>,
+    pub archived: Option<bool>,
+    pub position: Option<f32>,
 }
 
 #[utoipa::path(
@@ -191,38 +183,9 @@ pub async fn update_list(
     Ok(Json(ListResponse::from(list)))
 }
 
-#[utoipa::path(
-    post,
-    path = PATH_LISTS_REORDER,
-    tag = "Lists",
-    request_body = ListReorderRequest,
-    responses(
-        (status = 200, description = "Lists reordered successfully", body = ListResponse),
-        (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 404, description = "List not found", body = ErrorResponse),
-        (status = 500, description = "Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("jwt" = [])
-    )
-)]
-pub async fn reorder_lists(
-    State(manager): State<AppState>,
-    auth: AuthenticatedUser,
-    Valid(Json(payload)): Valid<Json<ListReorderRequest>>,
-) -> Result<Json<ListResponse>, AppError> {
-    let list = manager
-        .reorder_lists(&auth.username, payload.active_id, payload.over_id)
-        .await
-        .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::ListNotFound => {
-                AppError::NotFound("List not found".to_string())
-            }
-            _ => AppError::InternalServerError("Failed to reorder lists".to_string()),
-        })?;
-
-    Ok(Json(ListResponse::from(list)))
-}
+// -----------------------------------------------------------------------------
+// DELETE LIST
+// -----------------------------------------------------------------------------
 
 #[utoipa::path(
     delete,
@@ -257,6 +220,17 @@ pub async fn delete_list(
         })?;
 
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+// -----------------------------------------------------------------------------
+// DUPLICATE LIST
+// -----------------------------------------------------------------------------
+pub const PATH_LIST_DUPLICATE: &str = "/api/lists/{id}/duplicate";
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+pub struct DuplicateListRequest {
+    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    pub name: String,
 }
 
 #[utoipa::path(
@@ -297,4 +271,49 @@ pub async fn duplicate_list(
         axum::http::StatusCode::CREATED,
         Json(ListResponse::from(list)),
     ))
+}
+
+// -----------------------------------------------------------------------------
+// REORDER LISTS
+// -----------------------------------------------------------------------------
+pub const PATH_LISTS_REORDER: &str = "/api/lists/reorder";
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListReorderRequest {
+    pub active_id: Uuid,
+    pub over_id: Uuid,
+}
+
+#[utoipa::path(
+    post,
+    path = PATH_LISTS_REORDER,
+    tag = "Lists",
+    request_body = ListReorderRequest,
+    responses(
+        (status = 200, description = "Lists reordered successfully", body = ListResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "List not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn reorder_lists(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    Valid(Json(payload)): Valid<Json<ListReorderRequest>>,
+) -> Result<Json<ListResponse>, AppError> {
+    let list = manager
+        .reorder_lists(&auth.username, payload.active_id, payload.over_id)
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::ListNotFound => {
+                AppError::NotFound("List not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to reorder lists".to_string()),
+        })?;
+
+    Ok(Json(ListResponse::from(list)))
 }

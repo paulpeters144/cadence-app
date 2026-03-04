@@ -9,43 +9,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-pub const PATH_TASKS: &str = "/api/lists/{listId}/tasks";
-pub const PATH_TASK_ID: &str = "/api/lists/{listId}/tasks/{taskId}";
-pub const PATH_TASKS_REORDER: &str = "/api/lists/{listId}/tasks/reorder";
-
 // -----------------------------------------------------------------------------
-// SCHEMAS
+// RESPONSE SCHEMAS (SHARED)
 // -----------------------------------------------------------------------------
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-pub struct CreateTaskRequest {
-    #[validate(length(min = 1, message = "Title cannot be empty"))]
-    pub title: String,
-    pub points: Option<f32>,
-}
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskReorderRequest {
-    pub active_id: Uuid,
-    pub over_id: Uuid,
-}
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-pub struct UpdateTaskRequest {
-    pub title: Option<String>,
-    pub completed: Option<bool>,
-    pub points: Option<f32>,
-    pub position: Option<f32>,
-}
-
-#[derive(Deserialize, Validate, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct MoveTaskRequest {
-    pub from_list_id: Uuid,
-    pub to_list_id: Uuid,
-    pub position: Option<f32>,
-}
 
 #[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -74,12 +40,53 @@ impl From<Domain::Task> for TaskResponse {
 }
 
 // -----------------------------------------------------------------------------
-// HANDLERS
+// GET TASKS FOR A LIST
 // -----------------------------------------------------------------------------
+pub const PATH_TASKS: &str = "/api/lists/{listId}/tasks";
+
+#[utoipa::path(
+    get,
+    path = PATH_TASKS,
+    tag = "Tasks",
+    params(
+        ("listId" = Uuid, Path, description = "List ID")
+    ),
+    responses(
+        (status = 200, description = "Tasks retrieved successfully", body = [TaskResponse]),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_tasks(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(list_id): Path<Uuid>,
+) -> Result<Json<Vec<TaskResponse>>, AppError> {
+    let tasks = manager
+        .get_tasks(&auth.username, list_id)
+        .await
+        .map_err(|_| AppError::InternalServerError("Failed to fetch tasks".to_string()))?;
+
+    Ok(Json(tasks.into_iter().map(TaskResponse::from).collect()))
+}
+
+// -----------------------------------------------------------------------------
+// CREATE TASK
+// -----------------------------------------------------------------------------
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+pub struct CreateTaskRequest {
+    #[validate(length(min = 1, message = "Title cannot be empty"))]
+    pub title: String,
+    pub points: Option<f32>,
+}
 
 #[utoipa::path(
     post,
-    path = "/api/lists/{listId}/tasks",
+    path = PATH_TASKS,
     tag = "Tasks",
     params(
         ("listId" = Uuid, Path, description = "List ID")
@@ -117,38 +124,22 @@ pub async fn create_task(
     ))
 }
 
-#[utoipa::path(
-    get,
-    path = "/api/lists/{listId}/tasks",
-    tag = "Tasks",
-    params(
-        ("listId" = Uuid, Path, description = "List ID")
-    ),
-    responses(
-        (status = 200, description = "Tasks retrieved successfully", body = [TaskResponse]),
-        (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 500, description = "Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("jwt" = [])
-    )
-)]
-pub async fn get_tasks(
-    State(manager): State<AppState>,
-    auth: AuthenticatedUser,
-    Path(list_id): Path<Uuid>,
-) -> Result<Json<Vec<TaskResponse>>, AppError> {
-    let tasks = manager
-        .get_tasks(&auth.username, list_id)
-        .await
-        .map_err(|_| AppError::InternalServerError("Failed to fetch tasks".to_string()))?;
+// -----------------------------------------------------------------------------
+// UPDATE TASK
+// -----------------------------------------------------------------------------
+pub const PATH_TASK_ID: &str = "/api/lists/{listId}/tasks/{taskId}";
 
-    Ok(Json(tasks.into_iter().map(TaskResponse::from).collect()))
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+pub struct UpdateTaskRequest {
+    pub title: Option<String>,
+    pub completed: Option<bool>,
+    pub points: Option<f32>,
+    pub position: Option<f32>,
 }
 
 #[utoipa::path(
     patch,
-    path = "/api/lists/{listId}/tasks/{taskId}",
+    path = PATH_TASK_ID,
     tag = "Tasks",
     params(
         ("listId" = Uuid, Path, description = "List ID"),
@@ -192,9 +183,62 @@ pub async fn update_task(
     Ok(Json(TaskResponse::from(task)))
 }
 
+// -----------------------------------------------------------------------------
+// DELETE TASK
+// -----------------------------------------------------------------------------
+
+#[utoipa::path(
+    delete,
+    path = PATH_TASK_ID,
+    tag = "Tasks",
+    params(
+        ("listId" = Uuid, Path, description = "List ID"),
+        ("taskId" = Uuid, Path, description = "Task ID")
+    ),
+    responses(
+        (status = 204, description = "Task deleted successfully"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Task not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn delete_task(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    Path((list_id, task_id)): Path<(Uuid, Uuid)>,
+) -> Result<axum::http::StatusCode, AppError> {
+    manager
+        .delete_task(&auth.username, list_id, task_id)
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::TaskNotFound => {
+                AppError::NotFound("Task not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to delete task".to_string()),
+        })?;
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+// -----------------------------------------------------------------------------
+// MOVE TASK
+// -----------------------------------------------------------------------------
+pub const PATH_TASK_MOVE: &str = "/api/tasks/{taskId}/move";
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveTaskRequest {
+    pub from_list_id: Uuid,
+    pub to_list_id: Uuid,
+    pub position: Option<f32>,
+}
+
 #[utoipa::path(
     post,
-    path = "/api/tasks/{taskId}/move",
+    path = PATH_TASK_MOVE,
     tag = "Tasks",
     params(
         ("taskId" = Uuid, Path, description = "Task ID")
@@ -235,45 +279,21 @@ pub async fn move_task(
     Ok(Json(TaskResponse::from(task)))
 }
 
-#[utoipa::path(
-    delete,
-    path = "/api/lists/{listId}/tasks/{taskId}",
-    tag = "Tasks",
-    params(
-        ("listId" = Uuid, Path, description = "List ID"),
-        ("taskId" = Uuid, Path, description = "Task ID")
-    ),
-    responses(
-        (status = 204, description = "Task deleted successfully"),
-        (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 404, description = "Task not found", body = ErrorResponse),
-        (status = 500, description = "Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("jwt" = [])
-    )
-)]
-pub async fn delete_task(
-    State(manager): State<AppState>,
-    auth: AuthenticatedUser,
-    Path((list_id, task_id)): Path<(Uuid, Uuid)>,
-) -> Result<axum::http::StatusCode, AppError> {
-    manager
-        .delete_task(&auth.username, list_id, task_id)
-        .await
-        .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::TaskNotFound => {
-                AppError::NotFound("Task not found".to_string())
-            }
-            _ => AppError::InternalServerError("Failed to delete task".to_string()),
-        })?;
+// -----------------------------------------------------------------------------
+// REORDER TASKS
+// -----------------------------------------------------------------------------
+pub const PATH_TASKS_REORDER: &str = "/api/lists/{listId}/tasks/reorder";
 
-    Ok(axum::http::StatusCode::NO_CONTENT)
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskReorderRequest {
+    pub active_id: Uuid,
+    pub over_id: Uuid,
 }
 
 #[utoipa::path(
     post,
-    path = "/api/lists/{listId}/tasks/reorder",
+    path = PATH_TASKS_REORDER,
     tag = "Tasks",
     params(
         ("listId" = Uuid, Path, description = "List ID")
