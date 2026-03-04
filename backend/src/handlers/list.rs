@@ -33,30 +33,6 @@ pub struct UpdateListRequest {
 
 #[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct TaskResponse {
-    pub id: Uuid,
-    pub title: String,
-    pub completed: bool,
-    pub points: Option<f32>,
-    pub created_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
-}
-
-impl From<Domain::Task> for TaskResponse {
-    fn from(task: Domain::Task) -> Self {
-        Self {
-            id: task.id,
-            title: task.title,
-            completed: task.completed,
-            points: task.points,
-            created_at: task.created_at,
-            completed_at: task.completed_at,
-        }
-    }
-}
-
-#[derive(Serialize, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListResponse {
     pub id: Uuid,
     pub name: String,

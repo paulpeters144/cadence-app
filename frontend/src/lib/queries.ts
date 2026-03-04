@@ -68,6 +68,7 @@ export function useAddListMutation() {
 						id: `temp-${crypto.randomUUID()}`,
 						name,
 						tasks: [],
+						archived: false,
 					},
 				];
 			});
@@ -133,6 +134,7 @@ export function useDuplicateListMutation() {
 						...t,
 						id: `temp-${crypto.randomUUID()}`,
 						createdAt: new Date().toISOString(),
+						completed: false,
 					})),
 				};
 

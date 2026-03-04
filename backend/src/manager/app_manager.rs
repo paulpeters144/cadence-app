@@ -1,5 +1,7 @@
 use crate::Domain;
-use crate::access::local_repo::{AccessError, DbUserRepository, ListRepository, UserRepository};
+use crate::access::local_repo::{
+    AccessError, DbUserRepository, ListRepository, TaskRepository, UserRepository,
+};
 use crate::constants::JWT_EXPIRY_SECONDS;
 use argon2::{
     Argon2,
@@ -21,6 +23,7 @@ pub enum ManagerError {
     HashingError,
     UserNotFound,
     ListNotFound,
+    TaskNotFound,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -49,6 +52,33 @@ pub trait Manager: Send + Sync {
         journal: Option<String>,
         archived: Option<bool>,
     ) -> Result<Domain::List, ManagerError>;
+    async fn create_task(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        title: &str,
+        points: Option<f32>,
+    ) -> Result<Domain::Task, ManagerError>;
+    async fn get_tasks(
+        &self,
+        username: &str,
+        list_id: Uuid,
+    ) -> Result<Vec<Domain::Task>, ManagerError>;
+    async fn update_task(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        task_id: Uuid,
+        title: Option<String>,
+        completed: Option<bool>,
+        points: Option<f32>,
+    ) -> Result<Domain::Task, ManagerError>;
+    async fn delete_task(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        task_id: Uuid,
+    ) -> Result<(), ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
@@ -177,6 +207,66 @@ impl Manager for AppManager {
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::ListNotFound,
+                _ => ManagerError::DatabaseError,
+            })
+    }
+
+    async fn create_task(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        title: &str,
+        points: Option<f32>,
+    ) -> Result<Domain::Task, ManagerError> {
+        self.user_repo
+            .create_task(username, list_id, title, points)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::ListNotFound,
+                _ => ManagerError::DatabaseError,
+            })
+    }
+
+    async fn get_tasks(
+        &self,
+        username: &str,
+        list_id: Uuid,
+    ) -> Result<Vec<Domain::Task>, ManagerError> {
+        self.user_repo
+            .get_tasks(username, list_id)
+            .await
+            .map_err(|_| ManagerError::DatabaseError)
+    }
+
+    async fn update_task(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        task_id: Uuid,
+        title: Option<String>,
+        completed: Option<bool>,
+        points: Option<f32>,
+    ) -> Result<Domain::Task, ManagerError> {
+        self.user_repo
+            .update_task(username, list_id, task_id, title, completed, points)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::TaskNotFound,
+                _ => ManagerError::DatabaseError,
+            })
+    }
+
+    async fn delete_task(
+        &self,
+        username: &str,
+        list_id: Uuid,
+        task_id: Uuid,
+    ) -> Result<(), ManagerError> {
+        self.user_repo
+            .delete_task(username, list_id, task_id)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::TaskNotFound,
                 _ => ManagerError::DatabaseError,
             })
     }

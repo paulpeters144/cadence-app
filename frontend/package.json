@@ -9,7 +9,8 @@
 		"lint": "biome check .",
 		"format": "biome format --write .",
 		"preview": "vite preview",
-		"check": "npx tsgo --project ./tsconfig.json"
+		"check": "npx tsgo --project ./tsconfig.json",
+		"generate-types": "openapi-typescript ../backend/openapi.json -o src/lib/api-types.ts"
 	},
 	"dependencies": {
 		"@dnd-kit/core": "^6.3.1",
@@ -35,6 +36,7 @@
 		"@typescript/native-preview": "7.0.0-dev.20260301.1",
 		"@vitejs/plugin-react": "^5.1.1",
 		"autoprefixer": "^10.4.27",
+		"openapi-typescript": "7.6.1",
 		"postcss": "^8.5.6",
 		"tailwindcss": "^4.2.1",
 		"typescript": "~5.9.3",

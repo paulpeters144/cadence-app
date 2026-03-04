@@ -10,7 +10,7 @@ use axum::{
     Router,
     routing::{get, post},
 };
-use handlers::{list, user};
+use handlers::{list, task, user};
 use manager::app_manager::Manager;
 use std::sync::Arc;
 use utoipa::OpenApi;
@@ -26,7 +26,11 @@ pub type AppState = Arc<dyn Manager>;
         user::get_me,
         list::create_list,
         list::get_lists,
-        list::update_list
+        list::update_list,
+        task::create_task,
+        task::get_tasks,
+        task::update_task,
+        task::delete_task
     ),
     components(schemas(
         user::LoginRequest,
@@ -37,11 +41,13 @@ pub type AppState = Arc<dyn Manager>;
         list::CreateListRequest,
         list::UpdateListRequest,
         list::ListResponse,
-        list::TaskResponse,
+        task::CreateTaskRequest,
+        task::UpdateTaskRequest,
+        task::TaskResponse,
         error::ErrorResponse,
     ))
 )]
-struct ApiDoc;
+pub struct ApiDoc;
 
 pub fn app(state: AppState) -> Router {
     Router::new()
@@ -53,6 +59,14 @@ pub fn app(state: AppState) -> Router {
             post(list::create_list).get(list::get_lists),
         )
         .route(list::PATH_LIST_ID, axum::routing::patch(list::update_list))
+        .route(
+            task::PATH_TASKS,
+            post(task::create_task).get(task::get_tasks),
+        )
+        .route(
+            task::PATH_TASK_ID,
+            axum::routing::patch(task::update_task).delete(task::delete_task),
+        )
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }

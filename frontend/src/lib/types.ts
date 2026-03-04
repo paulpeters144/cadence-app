@@ -1,17 +1,18 @@
-export interface Task {
-	id: string;
-	title: string;
-	completed: boolean;
-	points?: 0.5 | 1 | 2 | 3 | 5 | 8;
-	createdAt: string;
-	completedAt?: string;
-}
+import type { components } from "./api-types";
 
-export interface List {
-	id: string;
-	name: string;
+export type Task = components["schemas"]["TaskResponse"];
+
+export type List = components["schemas"]["ListResponse"] & {
 	tasks: Task[];
-	journal?: string;
-	archived?: boolean;
-	archivedAt?: string;
-}
+};
+
+export type User = components["schemas"]["UserResponse"];
+export type LoginRequest = components["schemas"]["LoginRequest"];
+export type LoginResponse = components["schemas"]["LoginResponse"];
+export type RegisterRequest = components["schemas"]["RegisterRequest"];
+export type RegisterResponse = components["schemas"]["RegisterResponse"];
+export type CreateListRequest = components["schemas"]["CreateListRequest"];
+export type UpdateListRequest = components["schemas"]["UpdateListRequest"];
+export type CreateTaskRequest = components["schemas"]["CreateTaskRequest"];
+export type UpdateTaskRequest = components["schemas"]["UpdateTaskRequest"];
+export type ErrorResponse = components["schemas"]["ErrorResponse"];

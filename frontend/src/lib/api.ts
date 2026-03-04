@@ -42,7 +42,7 @@ export const api = {
 		return db.user;
 	},
 
-	async login(username: string, password?: string) {
+	async login(username: string, _password?: string) {
 		await delay(500);
 		const db = await getDB();
 		db.user = { username };
@@ -63,7 +63,7 @@ export const api = {
 	async addList(name: string) {
 		await delay(400);
 		const db = await getDB();
-		const newList: List = { id: crypto.randomUUID(), name, tasks: [] };
+		const newList: List = { id: crypto.randomUUID(), name, tasks: [], archived: false };
 		db.lists.push(newList);
 		return newList;
 	},
@@ -235,10 +235,12 @@ export const api = {
 		const newList: List = {
 			id: crypto.randomUUID(),
 			name: newName,
+			archived: false,
 			tasks: originalList.tasks.map((t) => ({
 				...t,
 				id: crypto.randomUUID(),
 				createdAt: new Date().toISOString(),
+				completed: false,
 			})),
 		};
 
