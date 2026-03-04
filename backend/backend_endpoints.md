@@ -105,11 +105,6 @@ This document outlines the current API endpoints and data structures implemented
   }
   ```
 
-#### Logout (Coming Soon)
-- **URL:** `POST /api/user/logout`
-- **Response:** `204 No Content`
-- **Note:** Should invalidate the refresh token on the backend.
-
 ---
 
 ### Lists
@@ -257,7 +252,6 @@ This document outlines the current API endpoints and data structures implemented
 3. **Persistence:** Data is persisted to a SQLite database.
 4. **Auth:** The application uses JWT (JSON Web Tokens) for authentication.
    - Use `access_token` for authenticating API requests via the `Authorization: Bearer <token>` header.
-   - Currently, a single `access_token` is returned upon login/registration. Refresh tokens are planned but not yet implemented.
 5. **CORS:** Ensure CORS is configured correctly for the frontend to communicate with the backend.
 6. **Error Responses:** Standard error response structure:
    ```json
@@ -284,8 +278,6 @@ This document outlines the current API endpoints and data structures implemented
 - [x] Delete Task (`DELETE /api/lists/:listId/tasks/:taskId`)
 
 ### Pending
-- [ ] Refresh Token (`POST /api/user/refresh`)
-- [ ] Logout (`POST /api/user/logout`)
 - [ ] Duplicate List (`POST /api/lists/:id/duplicate`)
 - [ ] Reorder Lists (`POST /api/lists/reorder`)
 - [ ] Move Task to Another List (`POST /api/tasks/:taskId/move`)
