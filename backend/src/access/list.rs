@@ -2,7 +2,7 @@ use sqlx::Row;
 use uuid::Uuid;
 use crate::Domain;
 use crate::access::error::AccessError;
-use crate::access::traits::ListRepository;
+use crate::access::traits::{ListRepository, UpdateListParams};
 use super::AppRepository;
 
 impl ListRepository for AppRepository {
@@ -102,12 +102,9 @@ impl ListRepository for AppRepository {
         &self,
         username: &str,
         id: Uuid,
-        name: Option<String>,
-        journal: Option<String>,
-        archived: Option<bool>,
-        position: Option<f32>,
+        params: UpdateListParams,
     ) -> Result<Domain::List, AccessError> {
-        let archived_at = archived.map(|a| if a { Some(chrono::Utc::now()) } else { None });
+        let archived_at = params.archived.map(|a| if a { Some(chrono::Utc::now()) } else { None });
 
         let row = sqlx::query(
             "UPDATE lists
@@ -122,12 +119,12 @@ impl ListRepository for AppRepository {
              WHERE username = ? AND id = ?
              RETURNING id, name, journal, archived, archived_at, position",
         )
-        .bind(name)
-        .bind(journal.is_some())
-        .bind(journal)
-        .bind(archived)
-        .bind(position)
-        .bind(archived.is_some())
+        .bind(params.name)
+        .bind(params.journal.is_some())
+        .bind(params.journal)
+        .bind(params.archived)
+        .bind(params.position)
+        .bind(params.archived.is_some())
         .bind(archived_at.flatten().map(|dt| dt.to_rfc3339()))
         .bind(username)
         .bind(id.to_string())
@@ -351,6 +348,11 @@ impl ListRepository for AppRepository {
             }
         };
 
-        self.update_list(username, active_id, None, None, None, Some(new_position)).await
+        self.update_list(username, active_id, UpdateListParams {
+            name: None,
+            journal: None,
+            archived: None,
+            position: Some(new_position),
+        }).await
     }
 }

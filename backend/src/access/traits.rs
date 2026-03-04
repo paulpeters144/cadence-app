@@ -1,8 +1,28 @@
+use super::error::AccessError;
 use crate::Domain;
 use uuid::Uuid;
-use super::error::AccessError;
 
-pub trait UserRepository: Send + Sync {
+pub struct UpdateListParams {
+    pub name: Option<String>,
+    pub journal: Option<String>,
+    pub archived: Option<bool>,
+    pub position: Option<f32>,
+}
+
+pub struct UpdateTaskParams {
+    pub title: Option<String>,
+    pub completed: Option<bool>,
+    pub points: Option<f32>,
+    pub position: Option<f32>,
+}
+
+pub trait UserRepository {
+    fn create_user(
+        &self,
+        username: &str,
+        password_hash: &str,
+    ) -> impl std::future::Future<Output = Result<(), AccessError>> + Send;
+
     fn get_user_by_username(
         &self,
         username: &str,
@@ -12,15 +32,9 @@ pub trait UserRepository: Send + Sync {
         &self,
         username: &str,
     ) -> impl std::future::Future<Output = Result<Option<String>, AccessError>> + Send;
-
-    fn create_user(
-        &self,
-        username: &str,
-        password_hash: &str,
-    ) -> impl std::future::Future<Output = Result<(), AccessError>> + Send;
 }
 
-pub trait ListRepository: Send + Sync {
+pub trait ListRepository {
     fn create_list(
         &self,
         username: &str,
@@ -38,10 +52,7 @@ pub trait ListRepository: Send + Sync {
         &self,
         username: &str,
         id: Uuid,
-        name: Option<String>,
-        journal: Option<String>,
-        archived: Option<bool>,
-        position: Option<f32>,
+        params: UpdateListParams,
     ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
 
     fn delete_list(
@@ -65,7 +76,7 @@ pub trait ListRepository: Send + Sync {
     ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
 }
 
-pub trait TaskRepository: Send + Sync {
+pub trait TaskRepository {
     fn create_task(
         &self,
         username: &str,
@@ -85,10 +96,7 @@ pub trait TaskRepository: Send + Sync {
         username: &str,
         list_id: Uuid,
         task_id: Uuid,
-        title: Option<String>,
-        completed: Option<bool>,
-        points: Option<f32>,
-        position: Option<f32>,
+        params: UpdateTaskParams,
     ) -> impl std::future::Future<Output = Result<Domain::Task, AccessError>> + Send;
 
     fn move_task(

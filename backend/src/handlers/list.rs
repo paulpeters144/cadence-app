@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::Domain;
+use crate::access::UpdateListParams;
 use crate::error::{AppError, ErrorResponse};
 use crate::handlers::util::auth::AuthenticatedUser;
 use axum::extract::Query;
@@ -164,10 +165,12 @@ pub async fn update_list(
         .update_list(
             &auth.username,
             id,
-            payload.name,
-            payload.journal,
-            payload.archived,
-            payload.position,
+            UpdateListParams {
+                name: payload.name,
+                journal: payload.journal,
+                archived: payload.archived,
+                position: payload.position,
+            },
         )
         .await
         .map_err(|e| match e {

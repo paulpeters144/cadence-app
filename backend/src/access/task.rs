@@ -2,7 +2,7 @@ use sqlx::Row;
 use uuid::Uuid;
 use crate::Domain;
 use crate::access::error::AccessError;
-use crate::access::traits::TaskRepository;
+use crate::access::traits::{TaskRepository, UpdateTaskParams};
 use super::AppRepository;
 
 impl TaskRepository for AppRepository {
@@ -119,12 +119,9 @@ impl TaskRepository for AppRepository {
         username: &str,
         list_id: Uuid,
         task_id: Uuid,
-        title: Option<String>,
-        completed: Option<bool>,
-        points: Option<f32>,
-        position: Option<f32>,
+        params: UpdateTaskParams,
     ) -> Result<Domain::Task, AccessError> {
-        let completed_at = completed.map(|c| if c { Some(chrono::Utc::now()) } else { None });
+        let completed_at = params.completed.map(|c| if c { Some(chrono::Utc::now()) } else { None });
 
         let row = sqlx::query(
             "UPDATE tasks
@@ -139,12 +136,12 @@ impl TaskRepository for AppRepository {
              WHERE id = ? AND list_id IN (SELECT id FROM lists WHERE id = ? AND username = ?)
              RETURNING id, title, completed, points, created_at, completed_at, position",
         )
-        .bind(title)
-        .bind(completed)
-        .bind(points.is_some())
-        .bind(points)
-        .bind(position)
-        .bind(completed.is_some())
+        .bind(params.title)
+        .bind(params.completed)
+        .bind(params.points.is_some())
+        .bind(params.points)
+        .bind(params.position)
+        .bind(params.completed.is_some())
         .bind(completed_at.flatten().map(|dt| dt.to_rfc3339()))
         .bind(task_id.to_string())
         .bind(list_id.to_string())
@@ -310,7 +307,12 @@ impl TaskRepository for AppRepository {
         over_id: Uuid,
     ) -> Result<Domain::Task, AccessError> {
         if active_id == over_id {
-            return self.update_task(username, list_id, active_id, None, None, None, None).await;
+            return self.update_task(username, list_id, active_id, UpdateTaskParams {
+                title: None,
+                completed: None,
+                points: None,
+                position: None,
+            }).await;
         }
 
         let tasks = self.get_tasks(username, list_id).await?;
@@ -338,6 +340,11 @@ impl TaskRepository for AppRepository {
             }
         };
 
-        self.update_task(username, list_id, active_id, None, None, None, Some(new_position)).await
+        self.update_task(username, list_id, active_id, UpdateTaskParams {
+            title: None,
+            completed: None,
+            points: None,
+            position: Some(new_position),
+        }).await
     }
 }

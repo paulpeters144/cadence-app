@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::Domain;
+use crate::access::UpdateTaskParams;
 use crate::error::{AppError, ErrorResponse};
 use crate::handlers::util::auth::AuthenticatedUser;
 use axum::{Json, extract::State, extract::Path};
@@ -167,10 +168,12 @@ pub async fn update_task(
             &auth.username,
             list_id,
             task_id,
-            payload.title,
-            payload.completed,
-            payload.points,
-            payload.position,
+            UpdateTaskParams {
+                title: payload.title,
+                completed: payload.completed,
+                points: payload.points,
+                position: payload.position,
+            },
         )
         .await
         .map_err(|e| match e {

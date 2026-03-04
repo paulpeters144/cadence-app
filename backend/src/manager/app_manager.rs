@@ -1,6 +1,7 @@
 use crate::Domain;
 use crate::access::{
     AccessError, ListRepository, AppRepository, TaskRepository, UserRepository,
+    UpdateListParams, UpdateTaskParams,
 };
 use crate::constants::JWT_EXPIRY_SECONDS;
 use argon2::{
@@ -48,10 +49,7 @@ pub trait Manager: Send + Sync {
         &self,
         username: &str,
         id: Uuid,
-        name: Option<String>,
-        journal: Option<String>,
-        archived: Option<bool>,
-        position: Option<f32>,
+        params: UpdateListParams,
     ) -> Result<Domain::List, ManagerError>;
     async fn create_task(
         &self,
@@ -70,10 +68,7 @@ pub trait Manager: Send + Sync {
         username: &str,
         list_id: Uuid,
         task_id: Uuid,
-        title: Option<String>,
-        completed: Option<bool>,
-        points: Option<f32>,
-        position: Option<f32>,
+        params: UpdateTaskParams,
     ) -> Result<Domain::Task, ManagerError>;
     async fn move_task(
         &self,
@@ -228,13 +223,10 @@ impl Manager for AppManager {
         &self,
         username: &str,
         id: Uuid,
-        name: Option<String>,
-        journal: Option<String>,
-        archived: Option<bool>,
-        position: Option<f32>,
+        params: UpdateListParams,
     ) -> Result<Domain::List, ManagerError> {
         self.user_repo
-            .update_list(username, id, name, journal, archived, position)
+            .update_list(username, id, params)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::ListNotFound,
@@ -274,13 +266,10 @@ impl Manager for AppManager {
         username: &str,
         list_id: Uuid,
         task_id: Uuid,
-        title: Option<String>,
-        completed: Option<bool>,
-        points: Option<f32>,
-        position: Option<f32>,
+        params: UpdateTaskParams,
     ) -> Result<Domain::Task, ManagerError> {
         self.user_repo
-            .update_task(username, list_id, task_id, title, completed, points, position)
+            .update_task(username, list_id, task_id, params)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::TaskNotFound,

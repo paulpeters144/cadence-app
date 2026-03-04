@@ -22,6 +22,7 @@ pub async fn setup_app() -> Router {
     app(state)
 }
 
+#[allow(dead_code)]
 pub async fn register_user(app: &Router, username: &str) -> String {
     let payload = json!({
         "username": username,
@@ -43,6 +44,7 @@ pub async fn register_user(app: &Router, username: &str) -> String {
     body_json["access_token"].as_str().unwrap().to_string()
 }
 
+#[allow(dead_code)]
 pub async fn create_list(app: &Router, token: &str, name: &str) -> String {
     let payload = json!({ "name": name });
     let req = Request::builder()
@@ -61,6 +63,7 @@ pub async fn create_list(app: &Router, token: &str, name: &str) -> String {
     body_json["id"].as_str().unwrap().to_string()
 }
 
+#[allow(dead_code)]
 pub async fn create_task(app: &Router, token: &str, list_id: &str, title: &str) -> String {
     let payload = json!({ "title": title });
     let req = Request::builder()

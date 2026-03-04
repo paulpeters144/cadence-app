@@ -5,7 +5,7 @@ pub mod list;
 pub mod task;
 
 pub use error::AccessError;
-pub use traits::{UserRepository, ListRepository, TaskRepository};
+pub use traits::{UserRepository, ListRepository, TaskRepository, UpdateListParams, UpdateTaskParams};
 
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 
