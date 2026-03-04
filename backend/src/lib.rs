@@ -52,7 +52,7 @@ pub fn app(state: AppState) -> Router {
             list::PATH_LISTS,
             post(list::create_list).get(list::get_lists),
         )
-        .route("/api/lists/{id}", axum::routing::patch(list::update_list))
+        .route(list::PATH_LIST_ID, axum::routing::patch(list::update_list))
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }

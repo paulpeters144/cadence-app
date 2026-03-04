@@ -145,15 +145,14 @@ This document outlines the current API endpoints and data structures implemented
 - **Response:** `201 Created`
 - **Body:** `List` object (newly created).
 
-#### Update List (Coming Soon)
+#### Update List
 - **URL:** `PATCH /api/lists/:id`
 - **Request Body:**
   ```json
   {
     "name": "string (optional)",
     "journal": "string (optional)",
-    "archived": "boolean (optional)",
-    "archivedAt": "ISO8601 string (optional)"
+    "archived": "boolean (optional)"
   }
   ```
 - **Response:** `200 OK`
@@ -266,3 +265,28 @@ This document outlines the current API endpoints and data structures implemented
      "error": "Error message description"
    }
    ```
+
+---
+
+## TODO List
+
+### Completed
+- [x] User Registration (`POST /api/user/register`)
+- [x] User Login (`POST /api/user/login`)
+- [x] Get Current User (`GET /api/user/me`)
+- [x] Get All Lists (`GET /api/lists`)
+- [x] Create List (`POST /api/lists`)
+- [x] Update List (`PATCH /api/lists/:id`)
+
+### Pending
+- [ ] Refresh Token (`POST /api/user/refresh`)
+- [ ] Logout (`POST /api/user/logout`)
+- [ ] Delete List (`DELETE /api/lists/:id`)
+- [ ] Duplicate List (`POST /api/lists/:id/duplicate`)
+- [ ] Reorder Lists (`POST /api/lists/reorder`)
+- [ ] Get Tasks for a List (`GET /api/lists/:listId/tasks`)
+- [ ] Create Task (`POST /api/lists/:listId/tasks`)
+- [ ] Update Task (`PATCH /api/lists/:listId/tasks/:taskId`)
+- [ ] Delete Task (`DELETE /api/lists/:listId/tasks/:taskId`)
+- [ ] Move Task to Another List (`POST /api/tasks/:taskId/move`)
+- [ ] Reorder Tasks within a List (`POST /api/lists/:listId/tasks/reorder`)

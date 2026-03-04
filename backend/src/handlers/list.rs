@@ -11,6 +11,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 pub const PATH_LISTS: &str = "/api/lists";
+pub const PATH_LIST_ID: &str = "/api/lists/{id}";
 
 // -----------------------------------------------------------------------------
 // SCHEMAS
@@ -150,7 +151,7 @@ pub async fn get_lists(
 
 #[utoipa::path(
     patch,
-    path = "/api/lists/{id}",
+    path = PATH_LIST_ID,
     tag = "Lists",
     params(
         ("id" = Uuid, Path, description = "List ID")
