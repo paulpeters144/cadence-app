@@ -181,3 +181,73 @@ async fn test_task_not_found() {
     let response = app.oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn test_move_task() {
+    let app = common::setup_app().await;
+    let token = common::register_user(&app, "move_user").await;
+    let list_id1 = common::create_list(&app, &token, "List 1").await;
+    let list_id2 = common::create_list(&app, &token, "List 2").await;
+
+    // 1. Create Task in List 1
+    let payload = json!({ "title": "Move Me" });
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/lists/{}/tasks", list_id1))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let task_json: Value = serde_json::from_slice(&body).unwrap();
+    let task_id = task_json["id"].as_str().unwrap();
+
+    // 2. Move Task to List 2
+    let move_payload = json!({
+        "fromListId": list_id1,
+        "toListId": list_id2,
+        "position": 500.0
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/tasks/{}/move", task_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&move_payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let moved_task: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(moved_task["position"], 500.0);
+
+    // 3. Verify in List 2
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/lists/{}/tasks", list_id2))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let tasks: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(tasks.as_array().unwrap().len(), 1);
+    assert_eq!(tasks[0]["id"], task_id);
+
+    // 4. Verify NOT in List 1
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/lists/{}/tasks", list_id1))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let tasks: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(tasks.as_array().unwrap().len(), 0);
+}

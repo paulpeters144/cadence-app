@@ -48,6 +48,13 @@ pub trait ListRepository: Send + Sync {
         username: &str,
         id: Uuid,
     ) -> impl std::future::Future<Output = Result<(), AccessError>> + Send;
+
+    fn duplicate_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        new_name: &str,
+    ) -> impl std::future::Future<Output = Result<Domain::List, AccessError>> + Send;
 }
 
 pub trait TaskRepository: Send + Sync {
@@ -73,6 +80,16 @@ pub trait TaskRepository: Send + Sync {
         title: Option<String>,
         completed: Option<bool>,
         points: Option<f32>,
+        position: Option<f32>,
+    ) -> impl std::future::Future<Output = Result<Domain::Task, AccessError>> + Send;
+
+    fn move_task(
+        &self,
+        username: &str,
+        task_id: Uuid,
+        from_list_id: Uuid,
+        to_list_id: Uuid,
+        position: Option<f32>,
     ) -> impl std::future::Future<Output = Result<Domain::Task, AccessError>> + Send;
 
     fn delete_task(

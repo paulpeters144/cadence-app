@@ -290,3 +290,74 @@ async fn test_delete_list_not_found() {
     let response = app.oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn test_duplicate_list_success() {
+    let app = common::setup_app().await;
+    let token = common::register_user(&app, "test_user_duplicate").await;
+
+    let list_id = common::create_list(&app, &token, "Original List").await;
+    common::create_task(&app, &token, &list_id, "Task 1").await;
+    common::create_task(&app, &token, &list_id, "Task 2").await;
+
+    // Duplicate the list
+    let duplicate_payload = json!({ "name": "Duplicated List" });
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/lists/{}/duplicate", list_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&duplicate_payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    let new_list_id = body_json["id"].as_str().unwrap();
+    assert_eq!(body_json["name"], "Duplicated List");
+    assert_ne!(new_list_id, list_id);
+
+    // Verify tasks are duplicated
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/lists/{}/tasks", new_list_id))
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    let tasks = body_json.as_array().unwrap();
+    assert_eq!(tasks.len(), 2);
+    assert_eq!(tasks[0]["title"], "Task 1");
+    assert_eq!(tasks[1]["title"], "Task 2");
+}
+
+#[tokio::test]
+async fn test_duplicate_list_unauthorized_owner() {
+    let app = common::setup_app().await;
+    
+    // User 1 creates a list
+    let token1 = common::register_user(&app, "user1_dup").await;
+    let list_id1 = common::create_list(&app, &token1, "User 1 List").await;
+    
+    // User 2 tries to duplicate User 1's list
+    let token2 = common::register_user(&app, "user2_dup").await;
+    let duplicate_payload = json!({ "name": "Duplicated List" });
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/lists/{}/duplicate", list_id1))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token2))
+        .body(Body::from(serde_json::to_vec(&duplicate_payload).unwrap()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+

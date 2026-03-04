@@ -51,11 +51,17 @@ impl AppRepository {
                 journal TEXT,
                 archived BOOLEAN NOT NULL DEFAULT 0,
                 archived_at TEXT,
+                position REAL NOT NULL DEFAULT 0,
                 FOREIGN KEY(username) REFERENCES users(username)
             );",
         )
         .execute(&self.pool)
         .await?;
+
+        // Add position column if it doesn't exist (for existing databases)
+        let _ = sqlx::query("ALTER TABLE lists ADD COLUMN position REAL NOT NULL DEFAULT 0")
+            .execute(&self.pool)
+            .await;
 
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS tasks (
@@ -66,11 +72,17 @@ impl AppRepository {
                 points REAL,
                 created_at TEXT NOT NULL,
                 completed_at TEXT,
+                position REAL NOT NULL DEFAULT 0,
                 FOREIGN KEY(list_id) REFERENCES lists(id)
             );",
         )
         .execute(&self.pool)
         .await?;
+
+        // Add position column if it doesn't exist (for existing databases)
+        let _ = sqlx::query("ALTER TABLE tasks ADD COLUMN position REAL NOT NULL DEFAULT 0")
+            .execute(&self.pool)
+            .await;
 
         Ok(())
     }

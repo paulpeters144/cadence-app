@@ -9,6 +9,7 @@ pub struct Task {
     pub title: String,
     pub completed: bool,
     pub points: Option<f32>,
+    pub position: f32,
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
 }
@@ -21,4 +22,5 @@ pub struct List {
     pub journal: Option<String>,
     pub archived: bool,
     pub archived_at: Option<DateTime<Utc>>,
+    pub position: f32,
 }

@@ -72,6 +72,15 @@ pub trait Manager: Send + Sync {
         title: Option<String>,
         completed: Option<bool>,
         points: Option<f32>,
+        position: Option<f32>,
+    ) -> Result<Domain::Task, ManagerError>;
+    async fn move_task(
+        &self,
+        username: &str,
+        task_id: Uuid,
+        from_list_id: Uuid,
+        to_list_id: Uuid,
+        position: Option<f32>,
     ) -> Result<Domain::Task, ManagerError>;
     async fn delete_task(
         &self,
@@ -80,6 +89,12 @@ pub trait Manager: Send + Sync {
         task_id: Uuid,
     ) -> Result<(), ManagerError>;
     async fn delete_list(&self, username: &str, id: Uuid) -> Result<(), ManagerError>;
+    async fn duplicate_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        new_name: &str,
+    ) -> Result<Domain::List, ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
 
@@ -247,9 +262,27 @@ impl Manager for AppManager {
         title: Option<String>,
         completed: Option<bool>,
         points: Option<f32>,
+        position: Option<f32>,
     ) -> Result<Domain::Task, ManagerError> {
         self.user_repo
-            .update_task(username, list_id, task_id, title, completed, points)
+            .update_task(username, list_id, task_id, title, completed, points, position)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::TaskNotFound,
+                _ => ManagerError::DatabaseError,
+            })
+    }
+
+    async fn move_task(
+        &self,
+        username: &str,
+        task_id: Uuid,
+        from_list_id: Uuid,
+        to_list_id: Uuid,
+        position: Option<f32>,
+    ) -> Result<Domain::Task, ManagerError> {
+        self.user_repo
+            .move_task(username, task_id, from_list_id, to_list_id, position)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::TaskNotFound,
@@ -279,6 +312,21 @@ impl Manager for AppManager {
                 _ => ManagerError::DatabaseError,
             }
         })
+    }
+
+    async fn duplicate_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        new_name: &str,
+    ) -> Result<Domain::List, ManagerError> {
+        self.user_repo
+            .duplicate_list(username, id, new_name)
+            .await
+            .map_err(|e| match e {
+                AccessError::NotFound => ManagerError::ListNotFound,
+                _ => ManagerError::DatabaseError,
+            })
     }
 
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError> {

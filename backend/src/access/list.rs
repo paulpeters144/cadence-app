@@ -10,10 +10,20 @@ impl ListRepository for AppRepository {
         let id = Uuid::new_v4();
         let id_str = id.to_string();
 
-        sqlx::query("INSERT INTO lists (id, username, name) VALUES (?, ?, ?)")
+        // Get max position
+        let max_pos: (f32,) = sqlx::query_as("SELECT COALESCE(MAX(position), 0.0) FROM lists WHERE username = ?")
+            .bind(username)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+        
+        let position = max_pos.0 + 1024.0;
+
+        sqlx::query("INSERT INTO lists (id, username, name, position) VALUES (?, ?, ?, ?)")
             .bind(id_str)
             .bind(username)
             .bind(name)
+            .bind(position)
             .execute(&self.pool)
             .await
             .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
@@ -24,6 +34,7 @@ impl ListRepository for AppRepository {
             journal: None,
             archived: false,
             archived_at: None,
+            position,
         })
     }
 
@@ -36,12 +47,12 @@ impl ListRepository for AppRepository {
         let take = take.unwrap_or(50);
         let sql = if start_id.is_some() {
             format!(
-                "SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ? AND id = ? LIMIT {}",
+                "SELECT id, name, journal, archived, archived_at, position FROM lists WHERE username = ? AND id = ? ORDER BY position ASC LIMIT {}",
                 take
             )
         } else {
             format!(
-                "SELECT id, name, journal, archived, archived_at FROM lists WHERE username = ? LIMIT {}",
+                "SELECT id, name, journal, archived, archived_at, position FROM lists WHERE username = ? ORDER BY position ASC LIMIT {}",
                 take
             )
         };
@@ -80,6 +91,7 @@ impl ListRepository for AppRepository {
                 journal: row.get("journal"),
                 archived: row.get("archived"),
                 archived_at,
+                position: row.get("position"),
             });
         }
 
@@ -106,7 +118,7 @@ impl ListRepository for AppRepository {
                     ELSE archived_at
                  END
              WHERE username = ? AND id = ?
-             RETURNING id, name, journal, archived, archived_at",
+             RETURNING id, name, journal, archived, archived_at, position",
         )
         .bind(name)
         .bind(journal.is_some())
@@ -141,6 +153,7 @@ impl ListRepository for AppRepository {
             journal: row.get("journal"),
             archived: row.get("archived"),
             archived_at,
+            position: row.get("position"),
         })
     }
 
@@ -175,5 +188,96 @@ impl ListRepository for AppRepository {
             .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
         Ok(())
+    }
+
+    async fn duplicate_list(
+        &self,
+        username: &str,
+        id: Uuid,
+        new_name: &str,
+    ) -> Result<Domain::List, AccessError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        // 1. Verify source list exists and belongs to the user
+        let list_exists = sqlx::query("SELECT 1 FROM lists WHERE id = ? AND username = ?")
+            .bind(id.to_string())
+            .bind(username)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        if list_exists.is_none() {
+            return Err(AccessError::NotFound);
+        }
+
+        // 2. Create new list
+        let new_id = Uuid::new_v4();
+        
+        // Get max position for lists for this user
+        let max_pos: (f32,) = sqlx::query_as("SELECT COALESCE(MAX(position), 0.0) FROM lists WHERE username = ?")
+            .bind(username)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+        
+        let position = max_pos.0 + 1024.0;
+
+        sqlx::query("INSERT INTO lists (id, username, name, position) VALUES (?, ?, ?, ?)")
+            .bind(new_id.to_string())
+            .bind(username)
+            .bind(new_name)
+            .bind(position)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        // 3. Fetch tasks from the source list
+        let rows = sqlx::query(
+            "SELECT title, points, position FROM tasks WHERE list_id = ? ORDER BY position ASC"
+        )
+        .bind(id.to_string())
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        // 4. Batch insert tasks into the new list (or loop)
+        for row in rows {
+            let task_id = Uuid::new_v4();
+            let created_at = chrono::Utc::now();
+            let title: String = row.get("title");
+            let points: Option<f32> = row.get("points");
+            let task_position: f32 = row.get("position");
+
+            sqlx::query(
+                "INSERT INTO tasks (id, list_id, title, points, created_at, position)
+                 VALUES (?, ?, ?, ?, ?, ?)",
+            )
+            .bind(task_id.to_string())
+            .bind(new_id.to_string())
+            .bind(title)
+            .bind(points)
+            .bind(created_at.to_rfc3339())
+            .bind(task_position)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+        Ok(Domain::List {
+            id: new_id,
+            name: new_name.to_string(),
+            journal: None,
+            archived: false,
+            archived_at: None,
+            position,
+        })
     }
 }

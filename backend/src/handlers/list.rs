@@ -12,6 +12,7 @@ use validator::Validate;
 
 pub const PATH_LISTS: &str = "/api/lists";
 pub const PATH_LIST_ID: &str = "/api/lists/{id}";
+pub const PATH_LIST_DUPLICATE: &str = "/api/lists/{id}/duplicate";
 
 // -----------------------------------------------------------------------------
 // SCHEMAS
@@ -19,6 +20,12 @@ pub const PATH_LIST_ID: &str = "/api/lists/{id}";
 
 #[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateListRequest {
+    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    pub name: String,
+}
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+pub struct DuplicateListRequest {
     #[validate(length(min = 1, message = "Name cannot be empty"))]
     pub name: String,
 }
@@ -205,4 +212,44 @@ pub async fn delete_list(
         })?;
 
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    post,
+    path = PATH_LIST_DUPLICATE,
+    tag = "Lists",
+    params(
+        ("id" = Uuid, Path, description = "List ID")
+    ),
+    request_body = DuplicateListRequest,
+    responses(
+        (status = 201, description = "List duplicated successfully", body = ListResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "List not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn duplicate_list(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+    Valid(Json(payload)): Valid<Json<DuplicateListRequest>>,
+) -> Result<(axum::http::StatusCode, Json<ListResponse>), AppError> {
+    let list = manager
+        .duplicate_list(&auth.username, id, &payload.name)
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::ListNotFound => {
+                AppError::NotFound("List not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to duplicate list".to_string()),
+        })?;
+
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(ListResponse::from(list)),
+    ))
 }

@@ -28,6 +28,15 @@ pub struct UpdateTaskRequest {
     pub title: Option<String>,
     pub completed: Option<bool>,
     pub points: Option<f32>,
+    pub position: Option<f32>,
+}
+
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveTaskRequest {
+    pub from_list_id: Uuid,
+    pub to_list_id: Uuid,
+    pub position: Option<f32>,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -37,6 +46,7 @@ pub struct TaskResponse {
     pub title: String,
     pub completed: bool,
     pub points: Option<f32>,
+    pub position: f32,
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
 }
@@ -48,6 +58,7 @@ impl From<Domain::Task> for TaskResponse {
             title: task.title,
             completed: task.completed,
             points: task.points,
+            position: task.position,
             created_at: task.created_at,
             completed_at: task.completed_at,
         }
@@ -160,6 +171,7 @@ pub async fn update_task(
             payload.title,
             payload.completed,
             payload.points,
+            payload.position,
         )
         .await
         .map_err(|e| match e {
@@ -167,6 +179,49 @@ pub async fn update_task(
                 AppError::NotFound("Task not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to update task".to_string()),
+        })?;
+
+    Ok(Json(TaskResponse::from(task)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/tasks/{taskId}/move",
+    tag = "Tasks",
+    params(
+        ("taskId" = Uuid, Path, description = "Task ID")
+    ),
+    request_body = MoveTaskRequest,
+    responses(
+        (status = 200, description = "Task moved successfully", body = TaskResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Task or List not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn move_task(
+    State(manager): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(task_id): Path<Uuid>,
+    Valid(Json(payload)): Valid<Json<MoveTaskRequest>>,
+) -> Result<Json<TaskResponse>, AppError> {
+    let task = manager
+        .move_task(
+            &auth.username,
+            task_id,
+            payload.from_list_id,
+            payload.to_list_id,
+            payload.position,
+        )
+        .await
+        .map_err(|e| match e {
+            crate::manager::app_manager::ManagerError::TaskNotFound => {
+                AppError::NotFound("Task or list not found".to_string())
+            }
+            _ => AppError::InternalServerError("Failed to move task".to_string()),
         })?;
 
     Ok(Json(TaskResponse::from(task)))

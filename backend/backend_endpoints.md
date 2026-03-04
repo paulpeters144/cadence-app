@@ -18,6 +18,7 @@ This document outlines the current API endpoints and data structures implemented
   "title": "string",
   "completed": "boolean",
   "points": "number (optional)",
+  "position": "number",
   "createdAt": "ISO8601 string",
   "completedAt": "ISO8601 string (optional)"
 }
@@ -30,7 +31,8 @@ This document outlines the current API endpoints and data structures implemented
   "name": "string",
   "journal": "string (optional)",
   "archived": "boolean",
-  "archivedAt": "ISO8601 string (optional)"
+  "archivedAt": "ISO8601 string (optional)",
+  "position": "number"
 }
 ```
 *Note: `tasks` are not currently returned as part of the list object.*
@@ -203,15 +205,15 @@ This document outlines the current API endpoints and data structures implemented
 - **Response:** `201 Created`
 - **Body:** `Task` object.
 
-#### Update Task (Toggle / Points)
+#### Update Task (Toggle / Points / Position)
 - **URL:** `PATCH /api/lists/:listId/tasks/:taskId`
 - **Request Body:**
   ```json
   {
     "completed": "boolean (optional)",
-    "completedAt": "ISO8601 string (optional)",
     "points": "number (optional)",
-    "title": "string (optional)"
+    "title": "string (optional)",
+    "position": "number (optional)"
   }
   ```
 - **Response:** `200 OK`
@@ -227,12 +229,14 @@ This document outlines the current API endpoints and data structures implemented
   ```json
   {
     "fromListId": "uuid",
-    "toListId": "uuid"
+    "toListId": "uuid",
+    "position": "number (optional)"
   }
   ```
 - **Response:** `200 OK`
+- **Body:** Updated `Task` object.
 
-#### Reorder Tasks within a List
+#### Reorder Tasks within a List (Coming Soon)
 - **URL:** `POST /api/lists/:listId/tasks/reorder`
 - **Request Body:**
   ```json
@@ -276,9 +280,9 @@ This document outlines the current API endpoints and data structures implemented
 - [x] Create Task (`POST /api/lists/:listId/tasks`)
 - [x] Update Task (`PATCH /api/lists/:listId/tasks/:taskId`)
 - [x] Delete Task (`DELETE /api/lists/:listId/tasks/:taskId`)
+- [x] Move Task to Another List (`POST /api/tasks/:taskId/move`)
 
 ### Pending
 - [ ] Duplicate List (`POST /api/lists/:id/duplicate`)
 - [ ] Reorder Lists (`POST /api/lists/reorder`)
-- [ ] Move Task to Another List (`POST /api/tasks/:taskId/move`)
 - [ ] Reorder Tasks within a List (`POST /api/lists/:listId/tasks/reorder`)

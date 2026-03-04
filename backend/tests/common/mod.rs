@@ -60,3 +60,21 @@ pub async fn create_list(app: &Router, token: &str, name: &str) -> String {
     let body_json: Value = serde_json::from_slice(&body).unwrap();
     body_json["id"].as_str().unwrap().to_string()
 }
+
+pub async fn create_task(app: &Router, token: &str, list_id: &str, title: &str) -> String {
+    let payload = json!({ "title": title });
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/lists/{}/tasks", list_id))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", token))
+        .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body_json: Value = serde_json::from_slice(&body).unwrap();
+    body_json["id"].as_str().unwrap().to_string()
+}
