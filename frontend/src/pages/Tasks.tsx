@@ -85,7 +85,7 @@ function DraggableTask({
 			ref={setNodeRef}
 			style={style}
 			className={cn(
-				"group flex items-center gap-4 py-4 border-b border-border/30 last:border-0 hover:bg-accent/5 px-4 -mx-4 rounded-xl bg-background",
+				"group relative flex items-start gap-4 py-4 border-b border-border/30 last:border-0 hover:bg-accent/5 px-4 -mx-4 rounded-xl bg-background",
 				isDragging && "z-10",
 				isArchived && "hover:bg-transparent",
 			)}
@@ -94,7 +94,7 @@ function DraggableTask({
 				{...listeners}
 				{...attributes}
 				className={cn(
-					"cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-primary -ml-2 p-1 rounded-md hover:bg-primary/5",
+					"cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-primary -ml-2 p-1 rounded-md hover:bg-primary/5 mt-0.5",
 					(isArchived || isEditing) && "hidden",
 				)}
 			>
@@ -106,7 +106,7 @@ function DraggableTask({
 				onClick={() => !isArchived && onToggle(listId, task.id, task.completed)}
 				disabled={isArchived}
 				className={cn(
-					"shrink-0",
+					"shrink-0 mt-1",
 					task.completed
 						? "text-primary/40"
 						: "text-muted-foreground/20 hover:text-primary",
@@ -136,7 +136,7 @@ function DraggableTask({
 					<button
 						type="button"
 						className={cn(
-							"text-[17px] leading-relaxed block truncate w-full text-left",
+							"text-[17px] leading-relaxed block break-words w-full text-left",
 							task.completed
 								? "text-muted-foreground/40 line-through decoration-1"
 								: "text-foreground/90",
@@ -150,7 +150,7 @@ function DraggableTask({
 			</div>
 
 			{!isArchived && !isEditing && (
-				<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+				<div className="absolute right-4 top-3.5 bg-background/95 backdrop-blur-sm pl-2 py-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-l-xl">
 					{([0.5, 1, 2, 3, 5, 8] as const).map((p) => (
 						<button
 							key={p}
@@ -182,7 +182,7 @@ function DraggableTask({
 			{task.points && (
 				<div
 					className={cn(
-						"text-[10px] font-black flex items-center justify-center w-6 h-6 rounded-full ring-1 transition-all",
+						"text-[10px] font-black flex items-center justify-center w-6 h-6 rounded-full ring-1 transition-all shrink-0 mt-0.5",
 						!isArchived && "group-hover:hidden",
 						task.completed
 							? "text-muted-foreground/20 bg-muted/5 ring-muted-foreground/10"
