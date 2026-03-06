@@ -3,9 +3,11 @@ pub mod traits;
 pub mod user;
 pub mod list;
 pub mod task;
+pub mod util;
 
 pub use error::AccessError;
 pub use traits::{UserRepository, ListRepository, TaskRepository, UpdateListParams, UpdateTaskParams};
+pub use util::{UtilRepository, DbTable};
 
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 

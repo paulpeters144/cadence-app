@@ -123,3 +123,4 @@ pub trait TaskRepository {
         over_id: Uuid,
     ) -> impl std::future::Future<Output = Result<Domain::Task, AccessError>> + Send;
 }
+

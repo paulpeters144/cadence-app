@@ -10,7 +10,7 @@ use axum::{
     Router,
     routing::{get, post},
 };
-use handlers::{list, task, user};
+use handlers::{list, task, user, health};
 use manager::app_manager::Manager;
 use std::sync::Arc;
 use utoipa::OpenApi;
@@ -35,7 +35,8 @@ pub type AppState = Arc<dyn Manager>;
         task::update_task,
         task::delete_task,
         task::move_task,
-        task::reorder_tasks
+        task::reorder_tasks,
+        health::health
     ),
     components(schemas(
         user::LoginRequest,
@@ -60,6 +61,7 @@ pub struct ApiDoc;
 
 pub fn app(state: AppState) -> Router {
     Router::new()
+        .route(health::PATH_HEALTH, get(health::health))
         .route(user::PATH_LOGIN, post(user::login))
         .route(user::PATH_REGISTER, post(user::register))
         .route(user::PATH_ME, get(user::get_me))
