@@ -1,350 +1,312 @@
-use sqlx::Row;
+use std::future::Future;
+use sqlx::{Executor, Row, Sqlite};
+use sqlx::sqlite::SqliteRow;
 use uuid::Uuid;
 use crate::Domain;
 use crate::access::error::AccessError;
-use crate::access::traits::{TaskRepository, UpdateTaskParams};
-use super::AppRepository;
+use crate::access::traits::DbQuery;
 
-impl TaskRepository for AppRepository {
-    async fn create_task(
-        &self,
-        username: &str,
-        list_id: Uuid,
-        title: &str,
-        points: Option<f32>,
-    ) -> Result<Domain::Task, AccessError> {
-        // Verify list ownership first
-        let list_exists = sqlx::query("SELECT 1 FROM lists WHERE id = ? AND username = ?")
-            .bind(list_id.to_string())
-            .bind(username)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+fn row_to_task(row: SqliteRow) -> Result<Domain::Task, AccessError> {
+    let id_str: String = row.get("id");
+    let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
-        if list_exists.is_none() {
-            return Err(AccessError::NotFound);
-        }
+    let created_at_str: String = row.get("created_at");
+    let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+        .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+        .with_timezone(&chrono::Utc);
 
-        let id = Uuid::new_v4();
-        let created_at = chrono::Utc::now();
+    let completed_at = row
+        .get::<Option<String>, _>("completed_at")
+        .map(|s| {
+            chrono::DateTime::parse_from_rfc3339(&s)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .map_err(|e| AccessError::DatabaseError(e.to_string()))
+        })
+        .transpose()?;
 
-        // Get max position to place new task at the end
-        let max_pos: (f32,) = sqlx::query_as("SELECT COALESCE(MAX(position), 0.0) FROM tasks WHERE list_id = ?")
-            .bind(list_id.to_string())
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+    Ok(Domain::Task {
+        id,
+        title: row.get("title"),
+        completed: row.get("completed"),
+        points: row.get("points"),
+        position: row.get("position"),
+        created_at,
+        completed_at,
+    })
+}
+
+pub struct CreateTask {
+    pub id: Uuid,
+    pub list_id: Uuid,
+    pub title: String,
+    pub points: Option<f32>,
+    pub position: f32,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl DbQuery for CreateTask {
+    type Response = Domain::Task;
+
+    fn execute<'e, E>(&self, executor: E) -> impl Future<Output = Result<Self::Response, AccessError>> + Send
+    where
+        E: Executor<'e, Database = Sqlite>
+    {
+        let id_str = self.id.to_string();
+        let list_id_str = self.list_id.to_string();
+        let title = self.title.clone();
+        let points = self.points;
+        let position = self.position;
+        let created_at = self.created_at;
         
-        let position = max_pos.0 + 1024.0; // Use 1024 as spacing for fractional indexing
+        let id = self.id;
 
-        sqlx::query(
-            "INSERT INTO tasks (id, list_id, title, points, created_at, position)
-             VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(id.to_string())
-        .bind(list_id.to_string())
-        .bind(title)
-        .bind(points)
-        .bind(created_at.to_rfc3339())
-        .bind(position)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+        async move {
+            sqlx::query(
+                "INSERT INTO tasks (id, list_id, title, points, created_at, position)
+                 VALUES (?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&id_str)
+            .bind(&list_id_str)
+            .bind(&title)
+            .bind(points)
+            .bind(created_at.to_rfc3339())
+            .bind(position)
+            .execute(executor)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
-        Ok(Domain::Task {
-            id,
-            title: title.to_string(),
-            completed: false,
-            points,
-            position,
-            created_at,
-            completed_at: None,
-        })
-    }
-
-    async fn get_tasks(
-        &self,
-        username: &str,
-        list_id: Uuid,
-    ) -> Result<Vec<Domain::Task>, AccessError> {
-        let rows = sqlx::query(
-            "SELECT t.id, t.title, t.completed, t.points, t.created_at, t.completed_at, t.position
-             FROM tasks t
-             JOIN lists l ON t.list_id = l.id
-             WHERE l.username = ? AND t.list_id = ?
-             ORDER BY t.position ASC",
-        )
-        .bind(username)
-        .bind(list_id.to_string())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-        let mut tasks = Vec::new();
-        for row in rows {
-            let id_str: String = row.get("id");
-            let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-            let created_at_str: String = row.get("created_at");
-            let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-                .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-                .with_timezone(&chrono::Utc);
-
-            let completed_at_str: Option<String> = row.get("completed_at");
-            let completed_at = match completed_at_str {
-                Some(s) => Some(
-                    chrono::DateTime::parse_from_rfc3339(&s)
-                        .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-                        .with_timezone(&chrono::Utc),
-                ),
-                None => None,
-            };
-
-            tasks.push(Domain::Task {
+            Ok(Domain::Task {
                 id,
-                title: row.get("title"),
-                completed: row.get("completed"),
-                points: row.get("points"),
-                position: row.get("position"),
+                title,
+                completed: false,
+                points,
+                position,
                 created_at,
-                completed_at,
-            });
+                completed_at: None,
+            })
         }
-
-        Ok(tasks)
     }
+}
 
-    async fn update_task(
-        &self,
-        username: &str,
-        list_id: Uuid,
-        task_id: Uuid,
-        params: UpdateTaskParams,
-    ) -> Result<Domain::Task, AccessError> {
-        let completed_at = params.completed.map(|c| if c { Some(chrono::Utc::now()) } else { None });
+pub struct GetTasks {
+    pub username: String,
+    pub list_id: Uuid,
+}
 
-        let row = sqlx::query(
-            "UPDATE tasks
-             SET title = COALESCE(?, title),
-                 completed = COALESCE(?, completed),
-                 points = CASE WHEN ? IS NOT NULL THEN ? ELSE points END,
-                 position = COALESCE(?, position),
-                 completed_at = CASE
-                    WHEN ? IS NOT NULL THEN ?
-                    ELSE completed_at
-                 END
-             WHERE id = ? AND list_id IN (SELECT id FROM lists WHERE id = ? AND username = ?)
-             RETURNING id, title, completed, points, created_at, completed_at, position",
-        )
-        .bind(params.title)
-        .bind(params.completed)
-        .bind(params.points.is_some())
-        .bind(params.points)
-        .bind(params.position)
-        .bind(params.completed.is_some())
-        .bind(completed_at.flatten().map(|dt| dt.to_rfc3339()))
-        .bind(task_id.to_string())
-        .bind(list_id.to_string())
-        .bind(username)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+impl DbQuery for GetTasks {
+    type Response = Vec<Domain::Task>;
 
-        let row = row.ok_or(AccessError::NotFound)?;
+    fn execute<'e, E>(&self, executor: E) -> impl Future<Output = Result<Self::Response, AccessError>> + Send
+    where
+        E: Executor<'e, Database = Sqlite>
+    {
+        let username = self.username.clone();
+        let list_id_str = self.list_id.to_string();
 
-        let id_str: String = row.get("id");
-        let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-        let created_at_str: String = row.get("created_at");
-        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-            .with_timezone(&chrono::Utc);
-
-        let completed_at_str: Option<String> = row.get("completed_at");
-        let completed_at = match completed_at_str {
-            Some(s) => Some(
-                chrono::DateTime::parse_from_rfc3339(&s)
-                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-                    .with_timezone(&chrono::Utc),
-            ),
-            None => None,
-        };
-
-        Ok(Domain::Task {
-            id,
-            title: row.get("title"),
-            completed: row.get("completed"),
-            points: row.get("points"),
-            position: row.get("position"),
-            created_at,
-            completed_at,
-        })
-    }
-
-    async fn move_task(
-        &self,
-        username: &str,
-        task_id: Uuid,
-        from_list_id: Uuid,
-        to_list_id: Uuid,
-        position: Option<f32>,
-    ) -> Result<Domain::Task, AccessError> {
-        let mut tx = self.pool.begin().await.map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-        // 1. Verify source list ownership and task existence
-        let task_check = sqlx::query("SELECT 1 FROM tasks t JOIN lists l ON t.list_id = l.id WHERE t.id = ? AND t.list_id = ? AND l.username = ?")
-            .bind(task_id.to_string())
-            .bind(from_list_id.to_string())
-            .bind(username)
-            .fetch_optional(&mut *tx)
+        async move {
+            let rows = sqlx::query(
+                "SELECT t.id, t.title, t.completed, t.points, t.created_at, t.completed_at, t.position
+                 FROM tasks t
+                 JOIN lists l ON t.list_id = l.id
+                 WHERE l.username = ? AND t.list_id = ?
+                 ORDER BY t.position ASC",
+            )
+            .bind(&username)
+            .bind(&list_id_str)
+            .fetch_all(executor)
             .await
             .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
-        if task_check.is_none() {
-            return Err(AccessError::NotFound);
+            rows.into_iter().map(row_to_task).collect()
         }
+    }
+}
 
-        // 2. Verify destination list ownership
-        let dest_check = sqlx::query("SELECT 1 FROM lists WHERE id = ? AND username = ?")
-            .bind(to_list_id.to_string())
-            .bind(username)
-            .fetch_optional(&mut *tx)
+pub struct UpdateTask {
+    pub username: String,
+    pub list_id: Uuid,
+    pub task_id: Uuid,
+    pub title: Option<String>,
+    pub completed: Option<bool>,
+    pub points: Option<f32>,
+    pub position: Option<f32>,
+    pub new_list_id: Option<Uuid>,
+}
+
+impl DbQuery for UpdateTask {
+    type Response = Domain::Task;
+
+    fn execute<'e, E>(&self, executor: E) -> impl Future<Output = Result<Self::Response, AccessError>> + Send
+    where
+        E: Executor<'e, Database = Sqlite>
+    {
+        let completed_at_str = self.completed
+            .and_then(|c| c.then(|| chrono::Utc::now().to_rfc3339()));
+
+        let title = self.title.clone();
+        let completed = self.completed;
+        let points_is_some = self.points.is_some();
+        let points = self.points;
+        let position = self.position;
+        let completed_is_some = self.completed.is_some();
+        
+        let new_list_id_str = self.new_list_id.map(|id| id.to_string());
+        
+        let task_id_str = self.task_id.to_string();
+        let list_id_str = self.list_id.to_string();
+        let username = self.username.clone();
+
+        async move {
+            let row = sqlx::query(
+                "UPDATE tasks
+                 SET title = COALESCE(?, title),
+                     completed = COALESCE(?, completed),
+                     points = CASE WHEN ? THEN ? ELSE points END,
+                     position = COALESCE(?, position),
+                     completed_at = CASE
+                        WHEN ? THEN ?
+                        ELSE completed_at
+                     END,
+                     list_id = COALESCE(?, list_id)
+                 WHERE id = ? AND list_id IN (SELECT id FROM lists WHERE id = ? AND username = ?)
+                 RETURNING id, title, completed, points, created_at, completed_at, position",
+            )
+            .bind(&title)
+            .bind(completed)
+            .bind(points_is_some)
+            .bind(points)
+            .bind(position)
+            .bind(completed_is_some)
+            .bind(&completed_at_str)
+            .bind(&new_list_id_str)
+            .bind(&task_id_str)
+            .bind(&list_id_str)
+            .bind(&username)
+            .fetch_optional(executor)
+            .await
+            .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+            .ok_or(AccessError::NotFound)?;
+
+            row_to_task(row)
+        }
+    }
+}
+
+pub struct DeleteTask {
+    pub username: String,
+    pub list_id: Uuid,
+    pub task_id: Uuid,
+}
+
+impl DbQuery for DeleteTask {
+    type Response = ();
+
+    fn execute<'e, E>(&self, executor: E) -> impl Future<Output = Result<Self::Response, AccessError>> + Send
+    where
+        E: Executor<'e, Database = Sqlite>
+    {
+        let task_id_str = self.task_id.to_string();
+        let list_id_str = self.list_id.to_string();
+        let username = self.username.clone();
+
+        async move {
+            let result = sqlx::query(
+                "DELETE FROM tasks
+                 WHERE id = ? AND list_id IN (SELECT id FROM lists WHERE id = ? AND username = ?)",
+            )
+            .bind(&task_id_str)
+            .bind(&list_id_str)
+            .bind(&username)
+            .execute(executor)
             .await
             .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
-        if dest_check.is_none() {
-            return Err(AccessError::NotFound);
-        }
-
-        // 3. Determine new position if not provided
-        let new_position = match position {
-            Some(p) => p,
-            None => {
-                let max_pos: (f32,) = sqlx::query_as("SELECT COALESCE(MAX(position), 0.0) FROM tasks WHERE list_id = ?")
-                    .bind(to_list_id.to_string())
-                    .fetch_one(&mut *tx)
-                    .await
-                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-                max_pos.0 + 1024.0
+            if result.rows_affected() == 0 {
+                return Err(AccessError::NotFound);
             }
-        };
 
-        // 4. Update the task
-        let row = sqlx::query(
-            "UPDATE tasks
-             SET list_id = ?,
-                 position = ?
-             WHERE id = ?
-             RETURNING id, title, completed, points, created_at, completed_at, position",
-        )
-        .bind(to_list_id.to_string())
-        .bind(new_position)
-        .bind(task_id.to_string())
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-        tx.commit().await.map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-        let id_str: String = row.get("id");
-        let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
-
-        let created_at_str: String = row.get("created_at");
-        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-            .with_timezone(&chrono::Utc);
-
-        let completed_at_str: Option<String> = row.get("completed_at");
-        let completed_at = match completed_at_str {
-            Some(s) => Some(
-                chrono::DateTime::parse_from_rfc3339(&s)
-                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?
-                    .with_timezone(&chrono::Utc),
-            ),
-            None => None,
-        };
-
-        Ok(Domain::Task {
-            id,
-            title: row.get("title"),
-            completed: row.get("completed"),
-            points: row.get("points"),
-            position: row.get("position"),
-            created_at,
-            completed_at,
-        })
+            Ok(())
+        }
     }
+}
 
-    async fn delete_task(
-        &self,
-        username: &str,
-        list_id: Uuid,
-        task_id: Uuid,
-    ) -> Result<(), AccessError> {
-        let result = sqlx::query(
-            "DELETE FROM tasks
-             WHERE id = ? AND list_id IN (SELECT id FROM lists WHERE id = ? AND username = ?)",
-        )
-        .bind(task_id.to_string())
-        .bind(list_id.to_string())
-        .bind(username)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+pub struct DeleteTasksByList {
+    pub list_id: Uuid,
+}
 
-        if result.rows_affected() == 0 {
-            return Err(AccessError::NotFound);
+impl DbQuery for DeleteTasksByList {
+    type Response = ();
+
+    fn execute<'e, E>(&self, executor: E) -> impl Future<Output = Result<Self::Response, AccessError>> + Send
+    where
+        E: Executor<'e, Database = Sqlite>
+    {
+        let list_id_str = self.list_id.to_string();
+
+        async move {
+            sqlx::query("DELETE FROM tasks WHERE list_id = ?")
+                .bind(&list_id_str)
+                .execute(executor)
+                .await
+                .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+            Ok(())
         }
-
-        Ok(())
     }
+}
 
-    async fn reorder_tasks(
-        &self,
-        username: &str,
-        list_id: Uuid,
-        active_id: Uuid,
-        over_id: Uuid,
-    ) -> Result<Domain::Task, AccessError> {
-        if active_id == over_id {
-            return self.update_task(username, list_id, active_id, UpdateTaskParams {
-                title: None,
-                completed: None,
-                points: None,
-                position: None,
-            }).await;
+pub struct GetMaxTaskPosition {
+    pub list_id: Uuid,
+}
+
+impl DbQuery for GetMaxTaskPosition {
+    type Response = f32;
+
+    fn execute<'e, E>(&self, executor: E) -> impl Future<Output = Result<Self::Response, AccessError>> + Send
+    where
+        E: Executor<'e, Database = Sqlite>
+    {
+        let list_id_str = self.list_id.to_string();
+
+        async move {
+            let max_pos: (f32,) = sqlx::query_as("SELECT COALESCE(MAX(position), 0.0) FROM tasks WHERE list_id = ?")
+                .bind(&list_id_str)
+                .fetch_one(executor)
+                .await
+                .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+            
+            Ok(max_pos.0)
         }
+    }
+}
 
-        let tasks = self.get_tasks(username, list_id).await?;
+pub struct CheckTaskExists {
+    pub username: String,
+    pub list_id: Uuid,
+    pub task_id: Uuid,
+}
 
-        let old_index = tasks.iter().position(|t| t.id == active_id).ok_or(AccessError::NotFound)?;
-        let new_index = tasks.iter().position(|t| t.id == over_id).ok_or(AccessError::NotFound)?;
+impl DbQuery for CheckTaskExists {
+    type Response = bool;
 
-        let new_position = if new_index > old_index {
-            // Moving down - place after over_id
-            let over_pos = tasks[new_index].position;
-            if new_index == tasks.len() - 1 {
-                over_pos + 1024.0
-            } else {
-                let next_pos = tasks[new_index + 1].position;
-                (over_pos + next_pos) / 2.0
-            }
-        } else {
-            // Moving up - place before over_id
-            let over_pos = tasks[new_index].position;
-            if new_index == 0 {
-                over_pos / 2.0
-            } else {
-                let prev_pos = tasks[new_index - 1].position;
-                (over_pos + prev_pos) / 2.0
-            }
-        };
+    fn execute<'e, E>(&self, executor: E) -> impl Future<Output = Result<Self::Response, AccessError>> + Send
+    where
+        E: Executor<'e, Database = Sqlite>
+    {
+        let task_id_str = self.task_id.to_string();
+        let list_id_str = self.list_id.to_string();
+        let username = self.username.clone();
 
-        self.update_task(username, list_id, active_id, UpdateTaskParams {
-            title: None,
-            completed: None,
-            points: None,
-            position: Some(new_position),
-        }).await
+        async move {
+            let row = sqlx::query("SELECT 1 FROM tasks t JOIN lists l ON t.list_id = l.id WHERE t.id = ? AND t.list_id = ? AND l.username = ?")
+                .bind(&task_id_str)
+                .bind(&list_id_str)
+                .bind(&username)
+                .fetch_optional(executor)
+                .await
+                .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+            Ok(row.is_some())
+        }
     }
 }

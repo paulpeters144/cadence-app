@@ -6,6 +6,9 @@
     "dev:frontend": "pnpm --filter frontend dev",
     "build:frontend": "pnpm --filter frontend build",
     "cdk:diff:uat": "pnpm --filter infra cdk:diff:uat",
-    "cdk:deploy:uat": "pnpm --filter infra cdk:deploy:uat"
+    "cdk:deploy:uat": "pnpm --filter infra cdk:deploy:uat",
+    "generate:api": "cd backend && cargo run --bin export_openapi",
+    "generate:types": "pnpm --filter frontend generate-types",
+    "generate": "pnpm run generate:api && pnpm run generate:types"
   }
 }

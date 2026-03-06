@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lists": {
         parameters: {
             query?: never;
@@ -20,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lists/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reorder_lists"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lists/{id}": {
         parameters: {
             query?: never;
@@ -30,10 +62,26 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["delete_list"];
         options?: never;
         head?: never;
         patch: operations["update_list"];
+        trace?: never;
+    };
+    "/api/lists/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["duplicate_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/lists/{listId}/tasks": {
@@ -46,6 +94,22 @@ export interface paths {
         get: operations["get_tasks"];
         put?: never;
         post: operations["create_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lists/{listId}/tasks/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reorder_tasks"];
         delete?: never;
         options?: never;
         head?: never;
@@ -66,6 +130,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["update_task"];
+        trace?: never;
+    };
+    "/api/tasks/{taskId}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["move_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/user/login": {
@@ -128,8 +208,17 @@ export interface components {
             points?: number | null;
             title: string;
         };
+        DuplicateListRequest: {
+            name: string;
+        };
         ErrorResponse: {
             message: string;
+        };
+        ListReorderRequest: {
+            /** Format: uuid */
+            activeId: string;
+            /** Format: uuid */
+            overId: string;
         };
         ListResponse: {
             archived: boolean;
@@ -139,6 +228,8 @@ export interface components {
             id: string;
             journal?: string | null;
             name: string;
+            /** Format: float */
+            position: number;
         };
         LoginRequest: {
             password: string;
@@ -148,6 +239,14 @@ export interface components {
             access_token: string;
             username: string;
         };
+        MoveTaskRequest: {
+            /** Format: uuid */
+            fromListId: string;
+            /** Format: float */
+            position?: number | null;
+            /** Format: uuid */
+            toListId: string;
+        };
         RegisterRequest: {
             password: string;
             username: string;
@@ -155,6 +254,12 @@ export interface components {
         RegisterResponse: {
             access_token: string;
             username: string;
+        };
+        TaskReorderRequest: {
+            /** Format: uuid */
+            activeId: string;
+            /** Format: uuid */
+            overId: string;
         };
         TaskResponse: {
             completed: boolean;
@@ -166,17 +271,23 @@ export interface components {
             id: string;
             /** Format: float */
             points?: number | null;
+            /** Format: float */
+            position: number;
             title: string;
         };
         UpdateListRequest: {
             archived?: boolean | null;
             journal?: string | null;
             name?: string | null;
+            /** Format: float */
+            position?: number | null;
         };
         UpdateTaskRequest: {
             completed?: boolean | null;
             /** Format: float */
             points?: number | null;
+            /** Format: float */
+            position?: number | null;
             title?: string | null;
         };
         UserResponse: {
@@ -191,6 +302,24 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Health check passed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_lists: {
         parameters: {
             query?: {
@@ -276,6 +405,105 @@ export interface operations {
             };
         };
     };
+    reorder_lists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Lists reordered successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description List not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description List not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     update_list: {
         parameters: {
             query?: never;
@@ -308,6 +536,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description List not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    duplicate_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateListRequest"];
+            };
+        };
+        responses: {
+            /** @description List duplicated successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponse"];
                 };
             };
             /** @description Unauthorized */
@@ -434,6 +716,60 @@ export interface operations {
             };
         };
     };
+    reorder_tasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List ID */
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Tasks reordered successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Task or List not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     delete_task: {
         parameters: {
             query?: never;
@@ -521,6 +857,60 @@ export interface operations {
                 };
             };
             /** @description Task not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    move_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task ID */
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Task moved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Task or List not found */
             404: {
                 headers: {
                     [name: string]: unknown;

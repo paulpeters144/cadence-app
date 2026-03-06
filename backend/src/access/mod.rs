@@ -1,18 +1,26 @@
 pub mod error;
-pub mod traits;
-pub mod user;
 pub mod list;
 pub mod task;
-pub mod util;
+pub mod traits;
+pub mod user;
 
 pub use error::AccessError;
-pub use traits::{UserRepository, ListRepository, TaskRepository, UpdateListParams, UpdateTaskParams};
-pub use util::{UtilRepository, DbTable};
+pub use traits::{DbQuery, TransactionalRepository, UpdateListParams, UpdateTaskParams};
+pub use user::{UserRepository, UserQuery, UserQueryResult};
 
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 
+#[derive(Clone)]
 pub struct AppRepository {
     pub(crate) pool: SqlitePool,
+}
+
+impl traits::TransactionalRepository for AppRepository {
+    async fn begin_transaction(
+        &self,
+    ) -> Result<sqlx::Transaction<'static, sqlx::Sqlite>, AccessError> {
+        self.pool.begin().await.map_err(|e| AccessError::DatabaseError(e.to_string()))
+    }
 }
 
 impl AppRepository {

@@ -9,6 +9,19 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Health check passed"
+          }
+        }
+      }
+    },
     "/api/lists": {
       "get": {
         "tags": [

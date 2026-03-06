@@ -1,7 +1,14 @@
 use crate::Domain;
+use crate::access::list::{
+    CheckListOwnership, CreateList, DeleteList, GetList, GetLists, GetMaxListPosition, UpdateList,
+};
+use crate::access::task::{
+    CheckTaskExists, CreateTask, DeleteTask, DeleteTasksByList, GetMaxTaskPosition, GetTasks,
+    UpdateTask,
+};
 use crate::access::{
-    AccessError, ListRepository, AppRepository, TaskRepository, UserRepository,
-    UpdateListParams, UpdateTaskParams,
+    AccessError, AppRepository, DbQuery, TransactionalRepository, UpdateListParams,
+    UpdateTaskParams, UserQuery, UserQueryResult, UserRepository,
 };
 use crate::constants::JWT_EXPIRY_SECONDS;
 use argon2::{
@@ -160,51 +167,77 @@ impl AppManager {
 #[async_trait]
 impl Manager for AppManager {
     async fn login(&self, username: &str, password: &str) -> Result<String, ManagerError> {
-        let user_result = self.user_repo.get_user_pwd_hash(username).await;
+        let query = UserQuery::GetByUsername(username.to_string());
+        let user_result = self.user_repo.execute(query).await;
 
         match user_result {
-            Ok(Some(hash)) => {
-                Self::verify_password(password, &hash)?;
+            Ok(UserQueryResult::User { password_hash, .. }) => {
+                Self::verify_password(password, &password_hash)?;
 
                 let access_token =
                     Self::create_jwt(username, &self.jwt_secret, JWT_EXPIRY_SECONDS)?;
 
                 Ok(access_token)
             }
-            Ok(None) => Err(ManagerError::InvalidCredentials),
+            Err(AccessError::NotFound) => Err(ManagerError::InvalidCredentials),
             Err(_) => Err(ManagerError::DatabaseError),
+            _ => Err(ManagerError::DatabaseError),
         }
     }
 
     async fn register(&self, username: &str, password: &str) -> Result<String, ManagerError> {
         let password_hash = Self::hash_password(password)?;
 
-        let result = self.user_repo.create_user(username, &password_hash).await;
+        let query = UserQuery::Create {
+            username: username.to_string(),
+            password_hash,
+        };
+        let result = self.user_repo.execute(query).await;
 
         match result {
-            Ok(_) => {
+            Ok(UserQueryResult::Success) => {
                 let access_token =
                     Self::create_jwt(username, &self.jwt_secret, JWT_EXPIRY_SECONDS)?;
                 Ok(access_token)
             }
             Err(AccessError::AlreadyExists) => Err(ManagerError::UserAlreadyExists),
             Err(_) => Err(ManagerError::DatabaseError),
+            _ => Err(ManagerError::DatabaseError),
         }
     }
 
     async fn get_user(&self, username: &str) -> Result<Domain::User, ManagerError> {
-        self.user_repo
-            .get_user_by_username(username)
-            .await
-            .map_err(|_| ManagerError::DatabaseError)?
-            .ok_or(ManagerError::UserNotFound)
+        let query = UserQuery::GetByUsername(username.to_string());
+        let result = self.user_repo.execute(query).await;
+
+        match result {
+            Ok(UserQueryResult::User { id, username, .. }) => Ok(Domain::User { id, username }),
+            Err(AccessError::NotFound) => Err(ManagerError::UserNotFound),
+            Err(_) => Err(ManagerError::DatabaseError),
+            _ => Err(ManagerError::DatabaseError),
+        }
     }
 
     async fn create_list(&self, username: &str, name: &str) -> Result<Domain::List, ManagerError> {
-        self.user_repo
-            .create_list(username, name)
-            .await
-            .map_err(|_| ManagerError::DatabaseError)
+        let max_pos = GetMaxListPosition {
+            username: username.to_string(),
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        let position = max_pos + 1024.0;
+        let id = Uuid::new_v4();
+
+        CreateList {
+            id,
+            username: username.to_string(),
+            name: name.to_string(),
+            position,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)
     }
 
     async fn get_lists(
@@ -213,10 +246,14 @@ impl Manager for AppManager {
         start_id: Option<Uuid>,
         take: Option<i32>,
     ) -> Result<Vec<Domain::List>, ManagerError> {
-        self.user_repo
-            .get_lists(username, start_id, take)
-            .await
-            .map_err(|_| ManagerError::DatabaseError)
+        GetLists {
+            username: username.to_string(),
+            start_id,
+            take,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)
     }
 
     async fn update_list(
@@ -225,13 +262,20 @@ impl Manager for AppManager {
         id: Uuid,
         params: UpdateListParams,
     ) -> Result<Domain::List, ManagerError> {
-        self.user_repo
-            .update_list(username, id, params)
-            .await
-            .map_err(|e| match e {
-                AccessError::NotFound => ManagerError::ListNotFound,
-                _ => ManagerError::DatabaseError,
-            })
+        UpdateList {
+            username: username.to_string(),
+            id,
+            name: params.name,
+            journal: params.journal,
+            archived: params.archived,
+            position: params.position,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|e| match e {
+            AccessError::NotFound => ManagerError::ListNotFound,
+            _ => ManagerError::DatabaseError,
+        })
     }
 
     async fn create_task(
@@ -241,13 +285,38 @@ impl Manager for AppManager {
         title: &str,
         points: Option<f32>,
     ) -> Result<Domain::Task, ManagerError> {
-        self.user_repo
-            .create_task(username, list_id, title, points)
+        let owns_list = CheckListOwnership {
+            username: username.to_string(),
+            id: list_id,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        if !owns_list {
+            return Err(ManagerError::ListNotFound);
+        }
+
+        let max_pos = GetMaxTaskPosition { list_id }
+            .execute(&self.user_repo.pool)
             .await
-            .map_err(|e| match e {
-                AccessError::NotFound => ManagerError::ListNotFound,
-                _ => ManagerError::DatabaseError,
-            })
+            .map_err(|_| ManagerError::DatabaseError)?;
+
+        let position = max_pos + 1024.0;
+        let id = Uuid::new_v4();
+        let created_at = chrono::Utc::now();
+
+        CreateTask {
+            id,
+            list_id,
+            title: title.to_string(),
+            points,
+            position,
+            created_at,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)
     }
 
     async fn get_tasks(
@@ -255,10 +324,13 @@ impl Manager for AppManager {
         username: &str,
         list_id: Uuid,
     ) -> Result<Vec<Domain::Task>, ManagerError> {
-        self.user_repo
-            .get_tasks(username, list_id)
-            .await
-            .map_err(|_| ManagerError::DatabaseError)
+        GetTasks {
+            username: username.to_string(),
+            list_id,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)
     }
 
     async fn update_task(
@@ -268,13 +340,22 @@ impl Manager for AppManager {
         task_id: Uuid,
         params: UpdateTaskParams,
     ) -> Result<Domain::Task, ManagerError> {
-        self.user_repo
-            .update_task(username, list_id, task_id, params)
-            .await
-            .map_err(|e| match e {
-                AccessError::NotFound => ManagerError::TaskNotFound,
-                _ => ManagerError::DatabaseError,
-            })
+        UpdateTask {
+            username: username.to_string(),
+            list_id,
+            task_id,
+            title: params.title,
+            completed: params.completed,
+            points: params.points,
+            position: params.position,
+            new_list_id: None,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|e| match e {
+            AccessError::NotFound => ManagerError::TaskNotFound,
+            _ => ManagerError::DatabaseError,
+        })
     }
 
     async fn move_task(
@@ -285,13 +366,70 @@ impl Manager for AppManager {
         to_list_id: Uuid,
         position: Option<f32>,
     ) -> Result<Domain::Task, ManagerError> {
-        self.user_repo
-            .move_task(username, task_id, from_list_id, to_list_id, position)
+        let mut tx = self
+            .user_repo
+            .begin_transaction()
             .await
-            .map_err(|e| match e {
-                AccessError::NotFound => ManagerError::TaskNotFound,
-                _ => ManagerError::DatabaseError,
-            })
+            .map_err(|_| ManagerError::DatabaseError)?;
+
+        let task_exists = CheckTaskExists {
+            username: username.to_string(),
+            list_id: from_list_id,
+            task_id,
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        if !task_exists {
+            return Err(ManagerError::TaskNotFound);
+        }
+
+        let dest_owns = CheckListOwnership {
+            username: username.to_string(),
+            id: to_list_id,
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        if !dest_owns {
+            return Err(ManagerError::ListNotFound);
+        }
+
+        let new_position = match position {
+            Some(p) => p,
+            None => {
+                let max_pos = GetMaxTaskPosition {
+                    list_id: to_list_id,
+                }
+                .execute(&mut *tx)
+                .await
+                .map_err(|_| ManagerError::DatabaseError)?;
+                max_pos + 1024.0
+            }
+        };
+
+        let updated_task = UpdateTask {
+            username: username.to_string(),
+            list_id: from_list_id,
+            task_id,
+            title: None,
+            completed: None,
+            points: None,
+            position: Some(new_position),
+            new_list_id: Some(to_list_id),
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| match e {
+            AccessError::NotFound => ManagerError::TaskNotFound,
+            _ => ManagerError::DatabaseError,
+        })?;
+
+        tx.commit().await.map_err(|_| ManagerError::DatabaseError)?;
+
+        Ok(updated_task)
     }
 
     async fn delete_task(
@@ -300,22 +438,57 @@ impl Manager for AppManager {
         list_id: Uuid,
         task_id: Uuid,
     ) -> Result<(), ManagerError> {
-        self.user_repo
-            .delete_task(username, list_id, task_id)
-            .await
-            .map_err(|e| match e {
-                AccessError::NotFound => ManagerError::TaskNotFound,
-                _ => ManagerError::DatabaseError,
-            })
+        DeleteTask {
+            username: username.to_string(),
+            list_id,
+            task_id,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|e| match e {
+            AccessError::NotFound => ManagerError::TaskNotFound,
+            _ => ManagerError::DatabaseError,
+        })
     }
 
     async fn delete_list(&self, username: &str, id: Uuid) -> Result<(), ManagerError> {
-        self.user_repo.delete_list(username, id).await.map_err(|e| {
-            match e {
-                AccessError::NotFound => ManagerError::ListNotFound,
-                _ => ManagerError::DatabaseError,
-            }
-        })
+        let mut tx = self
+            .user_repo
+            .begin_transaction()
+            .await
+            .map_err(|_| ManagerError::DatabaseError)?;
+
+        // First, check if the user owns the list
+        let owns_list = CheckListOwnership {
+            username: username.to_string(),
+            id,
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        if !owns_list {
+            return Err(ManagerError::ListNotFound);
+        }
+
+        DeleteTasksByList { list_id: id }
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| ManagerError::DatabaseError)?;
+
+        DeleteList {
+            username: username.to_string(),
+            id,
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| match e {
+            AccessError::NotFound => ManagerError::ListNotFound,
+            _ => ManagerError::DatabaseError,
+        })?;
+
+        tx.commit().await.map_err(|_| ManagerError::DatabaseError)?;
+        Ok(())
     }
 
     async fn duplicate_list(
@@ -324,13 +497,70 @@ impl Manager for AppManager {
         id: Uuid,
         new_name: &str,
     ) -> Result<Domain::List, ManagerError> {
-        self.user_repo
-            .duplicate_list(username, id, new_name)
+        let mut tx = self
+            .user_repo
+            .begin_transaction()
             .await
-            .map_err(|e| match e {
-                AccessError::NotFound => ManagerError::ListNotFound,
-                _ => ManagerError::DatabaseError,
-            })
+            .map_err(|_| ManagerError::DatabaseError)?;
+
+        let owns_list = CheckListOwnership {
+            username: username.to_string(),
+            id,
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        if !owns_list {
+            return Err(ManagerError::ListNotFound);
+        }
+
+        let max_pos = GetMaxListPosition {
+            username: username.to_string(),
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        let position = max_pos + 1024.0;
+        let new_id = Uuid::new_v4();
+
+        let new_list = CreateList {
+            id: new_id,
+            username: username.to_string(),
+            name: new_name.to_string(),
+            position,
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        let tasks = GetTasks {
+            username: username.to_string(),
+            list_id: id,
+        }
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        for task in tasks {
+            let new_task_id = Uuid::new_v4();
+            CreateTask {
+                id: new_task_id,
+                list_id: new_id,
+                title: task.title,
+                points: task.points,
+                position: task.position,
+                created_at: chrono::Utc::now(),
+            }
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| ManagerError::DatabaseError)?;
+        }
+
+        tx.commit().await.map_err(|_| ManagerError::DatabaseError)?;
+
+        Ok(new_list)
     }
 
     async fn reorder_lists(
@@ -339,13 +569,69 @@ impl Manager for AppManager {
         active_id: Uuid,
         over_id: Uuid,
     ) -> Result<Domain::List, ManagerError> {
-        self.user_repo
-            .reorder_lists(username, active_id, over_id)
+        if active_id == over_id {
+            return GetList {
+                username: username.to_string(),
+                id: active_id,
+            }
+            .execute(&self.user_repo.pool)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::ListNotFound,
                 _ => ManagerError::DatabaseError,
-            })
+            });
+        }
+
+        let lists = GetLists {
+            username: username.to_string(),
+            start_id: None,
+            take: Some(1000),
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        let old_index = lists
+            .iter()
+            .position(|l| l.id == active_id)
+            .ok_or(ManagerError::ListNotFound)?;
+        let new_index = lists
+            .iter()
+            .position(|l| l.id == over_id)
+            .ok_or(ManagerError::ListNotFound)?;
+
+        let new_position = if new_index > old_index {
+            let over_pos = lists[new_index].position;
+            if new_index == lists.len() - 1 {
+                over_pos + 1024.0
+            } else {
+                let next_pos = lists[new_index + 1].position;
+                (over_pos + next_pos) / 2.0
+            }
+        } else {
+            let over_pos = lists[new_index].position;
+            if new_index == 0 {
+                over_pos / 2.0
+            } else {
+                let prev_pos = lists[new_index - 1].position;
+                (over_pos + prev_pos) / 2.0
+            }
+        };
+
+        UpdateList {
+            username: username.to_string(),
+            id: active_id,
+            name: None,
+            journal: None,
+            archived: None,
+            position: Some(new_position),
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|e| match e {
+            AccessError::NotFound => ManagerError::ListNotFound,
+            _ => ManagerError::DatabaseError,
+        })
     }
 
     async fn reorder_tasks(
@@ -355,13 +641,76 @@ impl Manager for AppManager {
         active_id: Uuid,
         over_id: Uuid,
     ) -> Result<Domain::Task, ManagerError> {
-        self.user_repo
-            .reorder_tasks(username, list_id, active_id, over_id)
+        if active_id == over_id {
+            return UpdateTask {
+                username: username.to_string(),
+                list_id,
+                task_id: active_id,
+                title: None,
+                completed: None,
+                points: None,
+                position: None,
+                new_list_id: None,
+            }
+            .execute(&self.user_repo.pool)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::TaskNotFound,
                 _ => ManagerError::DatabaseError,
-            })
+            });
+        }
+
+        let tasks = GetTasks {
+            username: username.to_string(),
+            list_id,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|_| ManagerError::DatabaseError)?;
+
+        let old_index = tasks
+            .iter()
+            .position(|t| t.id == active_id)
+            .ok_or(ManagerError::TaskNotFound)?;
+        let new_index = tasks
+            .iter()
+            .position(|t| t.id == over_id)
+            .ok_or(ManagerError::TaskNotFound)?;
+
+        let new_position = if new_index > old_index {
+            let over_pos = tasks[new_index].position;
+            if new_index == tasks.len() - 1 {
+                over_pos + 1024.0
+            } else {
+                let next_pos = tasks[new_index + 1].position;
+                (over_pos + next_pos) / 2.0
+            }
+        } else {
+            let over_pos = tasks[new_index].position;
+            if new_index == 0 {
+                over_pos / 2.0
+            } else {
+                let prev_pos = tasks[new_index - 1].position;
+                (over_pos + prev_pos) / 2.0
+            }
+        };
+
+        UpdateTask {
+            username: username.to_string(),
+            list_id,
+            task_id: active_id,
+            title: None,
+            completed: None,
+            points: None,
+            position: Some(new_position),
+            new_list_id: None,
+        }
+        .execute(&self.user_repo.pool)
+        .await
+        .map_err(|e| match e {
+            AccessError::NotFound => ManagerError::TaskNotFound,
+            _ => ManagerError::DatabaseError,
+        })
     }
 
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError> {
