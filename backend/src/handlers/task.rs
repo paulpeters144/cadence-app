@@ -7,7 +7,6 @@ use axum::{Json, extract::State, extract::Path};
 use axum_valid::Valid;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use validator::Validate;
 
 // -----------------------------------------------------------------------------
@@ -17,7 +16,7 @@ use validator::Validate;
 #[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponse {
-    pub id: Uuid,
+    pub id: String,
     pub title: String,
     pub completed: bool,
     pub points: Option<f32>,
@@ -64,7 +63,7 @@ pub const PATH_TASKS: &str = "/api/lists/{listId}/tasks";
 pub async fn get_tasks(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    Path(list_id): Path<Uuid>,
+    Path(list_id): Path<String>,
 ) -> Result<Json<Vec<TaskResponse>>, AppError> {
     let tasks = manager
         .get_tasks(&auth.username, list_id)
@@ -106,7 +105,7 @@ pub struct CreateTaskRequest {
 pub async fn create_task(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    Path(list_id): Path<Uuid>,
+    Path(list_id): Path<String>,
     Valid(Json(payload)): Valid<Json<CreateTaskRequest>>,
 ) -> Result<(axum::http::StatusCode, Json<TaskResponse>), AppError> {
     let task = manager
@@ -160,7 +159,7 @@ pub struct UpdateTaskRequest {
 pub async fn update_task(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    Path((list_id, task_id)): Path<(Uuid, Uuid)>,
+    Path((list_id, task_id)): Path<(String, String)>,
     Valid(Json(payload)): Valid<Json<UpdateTaskRequest>>,
 ) -> Result<Json<TaskResponse>, AppError> {
     let task = manager
@@ -211,7 +210,7 @@ pub async fn update_task(
 pub async fn delete_task(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    Path((list_id, task_id)): Path<(Uuid, Uuid)>,
+    Path((list_id, task_id)): Path<(String, String)>,
 ) -> Result<axum::http::StatusCode, AppError> {
     manager
         .delete_task(&auth.username, list_id, task_id)
@@ -234,8 +233,8 @@ pub const PATH_TASK_MOVE: &str = "/api/tasks/{taskId}/move";
 #[derive(Deserialize, Validate, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveTaskRequest {
-    pub from_list_id: Uuid,
-    pub to_list_id: Uuid,
+    pub from_list_id: String,
+    pub to_list_id: String,
     pub position: Option<f32>,
 }
 
@@ -260,7 +259,7 @@ pub struct MoveTaskRequest {
 pub async fn move_task(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    Path(task_id): Path<Uuid>,
+    Path(task_id): Path<String>,
     Valid(Json(payload)): Valid<Json<MoveTaskRequest>>,
 ) -> Result<Json<TaskResponse>, AppError> {
     let task = manager
@@ -290,8 +289,8 @@ pub const PATH_TASKS_REORDER: &str = "/api/lists/{listId}/tasks/reorder";
 #[derive(Deserialize, Validate, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskReorderRequest {
-    pub active_id: Uuid,
-    pub over_id: Uuid,
+    pub active_id: String,
+    pub over_id: String,
 }
 
 #[utoipa::path(
@@ -315,7 +314,7 @@ pub struct TaskReorderRequest {
 pub async fn reorder_tasks(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    Path(list_id): Path<Uuid>,
+    Path(list_id): Path<String>,
     Valid(Json(payload)): Valid<Json<TaskReorderRequest>>,
 ) -> Result<Json<TaskResponse>, AppError> {
     let task = manager

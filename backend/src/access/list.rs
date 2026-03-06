@@ -1,14 +1,12 @@
 use std::future::Future;
 use sqlx::{Executor, Row, Sqlite};
 use sqlx::sqlite::SqliteRow;
-use uuid::Uuid;
 use crate::Domain;
 use crate::access::error::AccessError;
 use crate::access::traits::DbQuery;
 
 fn row_to_list(row: SqliteRow) -> Result<Domain::List, AccessError> {
-    let id_str: String = row.get("id");
-    let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+    let id: String = row.get("id");
 
     let archived_at = row
         .get::<Option<String>, _>("archived_at")
@@ -30,7 +28,7 @@ fn row_to_list(row: SqliteRow) -> Result<Domain::List, AccessError> {
 }
 
 pub struct CreateList {
-    pub id: Uuid,
+    pub id: String,
     pub username: String,
     pub name: String,
     pub position: f32,
@@ -47,7 +45,7 @@ impl DbQuery for CreateList {
         let username = self.username.clone();
         let name = self.name.clone();
         let position = self.position;
-        let id = self.id;
+        let id = self.id.clone();
 
         async move {
             sqlx::query("INSERT INTO lists (id, username, name, position) VALUES (?, ?, ?, ?)")
@@ -73,7 +71,7 @@ impl DbQuery for CreateList {
 
 pub struct GetLists {
     pub username: String,
-    pub start_id: Option<Uuid>,
+    pub start_id: Option<String>,
     pub take: Option<i32>,
 }
 
@@ -85,7 +83,7 @@ impl DbQuery for GetLists {
         E: Executor<'e, Database = Sqlite>
     {
         let username = self.username.clone();
-        let start_id = self.start_id.map(|s| s.to_string());
+        let start_id = self.start_id.clone().map(|s| s.to_string());
         let take = self.take.unwrap_or(50);
 
         async move {
@@ -118,7 +116,7 @@ impl DbQuery for GetLists {
 
 pub struct GetList {
     pub username: String,
-    pub id: Uuid,
+    pub id: String,
 }
 
 impl DbQuery for GetList {
@@ -151,7 +149,7 @@ impl DbQuery for GetList {
 
 pub struct UpdateList {
     pub username: String,
-    pub id: Uuid,
+    pub id: String,
     pub name: Option<String>,
     pub journal: Option<String>,
     pub archived: Option<bool>,
@@ -212,7 +210,7 @@ impl DbQuery for UpdateList {
 
 pub struct DeleteList {
     pub username: String,
-    pub id: Uuid,
+    pub id: String,
 }
 
 impl DbQuery for DeleteList {
@@ -269,7 +267,7 @@ impl DbQuery for GetMaxListPosition {
 
 pub struct CheckListOwnership {
     pub username: String,
-    pub id: Uuid,
+    pub id: String,
 }
 
 impl DbQuery for CheckListOwnership {

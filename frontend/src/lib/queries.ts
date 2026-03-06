@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 import type { List, Task } from "./types";
+import { generateShortId } from "./utils";
 
 export const queryKeys = {
 	user: ["user"] as const,
@@ -65,7 +66,7 @@ export function useAddListMutation() {
 				return [
 					...old,
 					{
-						id: `temp-${crypto.randomUUID()}`,
+						id: `temp-${generateShortId()}`,
 						name,
 						tasks: [],
 						archived: false,
@@ -129,11 +130,11 @@ export function useDuplicateListMutation() {
 
 				const newList: List = {
 					...originalList,
-					id: `temp-${crypto.randomUUID()}`,
+					id: `temp-${generateShortId()}`,
 					name: newName,
 					tasks: originalList.tasks.map((t) => ({
 						...t,
-						id: `temp-${crypto.randomUUID()}`,
+						id: `temp-${generateShortId()}`,
 						createdAt: new Date().toISOString(),
 						completed: false,
 					})),
@@ -379,7 +380,7 @@ export function useAddTaskMutation() {
 				return old.map((l) => {
 					if (l.id !== listId) return l;
 					const newTask: Task = {
-						id: crypto.randomUUID(),
+						id: generateShortId(),
 						title,
 						completed: false,
 						createdAt: new Date().toISOString(),

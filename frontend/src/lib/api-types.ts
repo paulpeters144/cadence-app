@@ -215,16 +215,13 @@ export interface components {
             message: string;
         };
         ListReorderRequest: {
-            /** Format: uuid */
             activeId: string;
-            /** Format: uuid */
             overId: string;
         };
         ListResponse: {
             archived: boolean;
             /** Format: date-time */
             archivedAt?: string | null;
-            /** Format: uuid */
             id: string;
             journal?: string | null;
             name: string;
@@ -241,11 +238,9 @@ export interface components {
             username: string;
         };
         MoveTaskRequest: {
-            /** Format: uuid */
             fromListId: string;
             /** Format: float */
             position?: number | null;
-            /** Format: uuid */
             toListId: string;
         };
         RegisterRequest: {
@@ -257,9 +252,7 @@ export interface components {
             username: string;
         };
         TaskReorderRequest: {
-            /** Format: uuid */
             activeId: string;
-            /** Format: uuid */
             overId: string;
         };
         TaskResponse: {
@@ -268,7 +261,6 @@ export interface components {
             completedAt?: string | null;
             /** Format: date-time */
             createdAt: string;
-            /** Format: uuid */
             id: string;
             /** Format: float */
             points?: number | null;

@@ -20,7 +20,6 @@ use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode}
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Debug, PartialEq)]
 pub enum ManagerError {
@@ -49,67 +48,67 @@ pub trait Manager: Send + Sync {
     async fn get_lists(
         &self,
         username: &str,
-        start_id: Option<Uuid>,
+        start_id: Option<String>,
         take: Option<i32>,
     ) -> Result<Vec<Domain::List>, ManagerError>;
     async fn update_list(
         &self,
         username: &str,
-        id: Uuid,
+        id: String,
         params: UpdateListParams,
     ) -> Result<Domain::List, ManagerError>;
     async fn create_task(
         &self,
         username: &str,
-        list_id: Uuid,
+        list_id: String,
         title: &str,
         points: Option<f32>,
     ) -> Result<Domain::Task, ManagerError>;
     async fn get_tasks(
         &self,
         username: &str,
-        list_id: Uuid,
+        list_id: String,
     ) -> Result<Vec<Domain::Task>, ManagerError>;
     async fn update_task(
         &self,
         username: &str,
-        list_id: Uuid,
-        task_id: Uuid,
+        list_id: String,
+        task_id: String,
         params: UpdateTaskParams,
     ) -> Result<Domain::Task, ManagerError>;
     async fn move_task(
         &self,
         username: &str,
-        task_id: Uuid,
-        from_list_id: Uuid,
-        to_list_id: Uuid,
+        task_id: String,
+        from_list_id: String,
+        to_list_id: String,
         position: Option<f32>,
     ) -> Result<Domain::Task, ManagerError>;
     async fn delete_task(
         &self,
         username: &str,
-        list_id: Uuid,
-        task_id: Uuid,
+        list_id: String,
+        task_id: String,
     ) -> Result<(), ManagerError>;
-    async fn delete_list(&self, username: &str, id: Uuid) -> Result<(), ManagerError>;
+    async fn delete_list(&self, username: &str, id: String) -> Result<(), ManagerError>;
     async fn duplicate_list(
         &self,
         username: &str,
-        id: Uuid,
+        id: String,
         new_name: &str,
     ) -> Result<Domain::List, ManagerError>;
     async fn reorder_lists(
         &self,
         username: &str,
-        active_id: Uuid,
-        over_id: Uuid,
+        active_id: String,
+        over_id: String,
     ) -> Result<Domain::List, ManagerError>;
     async fn reorder_tasks(
         &self,
         username: &str,
-        list_id: Uuid,
-        active_id: Uuid,
-        over_id: Uuid,
+        list_id: String,
+        active_id: String,
+        over_id: String,
     ) -> Result<Domain::Task, ManagerError>;
     fn verify_jwt(&self, token: &str) -> Result<String, ManagerError>;
 }
@@ -211,7 +210,7 @@ impl Manager for AppManager {
         let result = self.user_repo.execute(query).await;
 
         match result {
-            Ok(UserQueryResult::User { id, username, .. }) => Ok(Domain::User { id, username }),
+            Ok(UserQueryResult::User { id, username, .. }) => Ok(Domain::User { id: id.to_string(), username }),
             Err(AccessError::NotFound) => Err(ManagerError::UserNotFound),
             Err(_) => Err(ManagerError::DatabaseError),
             _ => Err(ManagerError::DatabaseError),
@@ -227,7 +226,7 @@ impl Manager for AppManager {
         .map_err(|_| ManagerError::DatabaseError)?;
 
         let position = max_pos + 1024.0;
-        let id = Uuid::new_v4();
+        let id = crate::handlers::util::id::generate_short_id();
 
         CreateList {
             id,
@@ -243,7 +242,7 @@ impl Manager for AppManager {
     async fn get_lists(
         &self,
         username: &str,
-        start_id: Option<Uuid>,
+        start_id: Option<String>,
         take: Option<i32>,
     ) -> Result<Vec<Domain::List>, ManagerError> {
         GetLists {
@@ -259,7 +258,7 @@ impl Manager for AppManager {
     async fn update_list(
         &self,
         username: &str,
-        id: Uuid,
+        id: String,
         params: UpdateListParams,
     ) -> Result<Domain::List, ManagerError> {
         UpdateList {
@@ -281,13 +280,13 @@ impl Manager for AppManager {
     async fn create_task(
         &self,
         username: &str,
-        list_id: Uuid,
+        list_id: String,
         title: &str,
         points: Option<f32>,
     ) -> Result<Domain::Task, ManagerError> {
         let owns_list = CheckListOwnership {
             username: username.to_string(),
-            id: list_id,
+            id: list_id.clone(),
         }
         .execute(&self.user_repo.pool)
         .await
@@ -297,13 +296,13 @@ impl Manager for AppManager {
             return Err(ManagerError::ListNotFound);
         }
 
-        let max_pos = GetMaxTaskPosition { list_id }
+        let max_pos = GetMaxTaskPosition { list_id: list_id.clone() }
             .execute(&self.user_repo.pool)
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
 
         let position = max_pos + 1024.0;
-        let id = Uuid::new_v4();
+        let id = crate::handlers::util::id::generate_short_id();
         let created_at = chrono::Utc::now();
 
         CreateTask {
@@ -322,7 +321,7 @@ impl Manager for AppManager {
     async fn get_tasks(
         &self,
         username: &str,
-        list_id: Uuid,
+        list_id: String,
     ) -> Result<Vec<Domain::Task>, ManagerError> {
         GetTasks {
             username: username.to_string(),
@@ -336,8 +335,8 @@ impl Manager for AppManager {
     async fn update_task(
         &self,
         username: &str,
-        list_id: Uuid,
-        task_id: Uuid,
+        list_id: String,
+        task_id: String,
         params: UpdateTaskParams,
     ) -> Result<Domain::Task, ManagerError> {
         UpdateTask {
@@ -361,9 +360,9 @@ impl Manager for AppManager {
     async fn move_task(
         &self,
         username: &str,
-        task_id: Uuid,
-        from_list_id: Uuid,
-        to_list_id: Uuid,
+        task_id: String,
+        from_list_id: String,
+        to_list_id: String,
         position: Option<f32>,
     ) -> Result<Domain::Task, ManagerError> {
         let mut tx = self
@@ -374,8 +373,8 @@ impl Manager for AppManager {
 
         let task_exists = CheckTaskExists {
             username: username.to_string(),
-            list_id: from_list_id,
-            task_id,
+            list_id: from_list_id.clone(),
+            task_id: task_id.clone(),
         }
         .execute(&mut *tx)
         .await
@@ -387,7 +386,7 @@ impl Manager for AppManager {
 
         let dest_owns = CheckListOwnership {
             username: username.to_string(),
-            id: to_list_id,
+            id: to_list_id.clone(),
         }
         .execute(&mut *tx)
         .await
@@ -401,7 +400,7 @@ impl Manager for AppManager {
             Some(p) => p,
             None => {
                 let max_pos = GetMaxTaskPosition {
-                    list_id: to_list_id,
+                    list_id: to_list_id.clone(),
                 }
                 .execute(&mut *tx)
                 .await
@@ -435,8 +434,8 @@ impl Manager for AppManager {
     async fn delete_task(
         &self,
         username: &str,
-        list_id: Uuid,
-        task_id: Uuid,
+        list_id: String,
+        task_id: String,
     ) -> Result<(), ManagerError> {
         DeleteTask {
             username: username.to_string(),
@@ -451,7 +450,7 @@ impl Manager for AppManager {
         })
     }
 
-    async fn delete_list(&self, username: &str, id: Uuid) -> Result<(), ManagerError> {
+    async fn delete_list(&self, username: &str, id: String) -> Result<(), ManagerError> {
         let mut tx = self
             .user_repo
             .begin_transaction()
@@ -461,7 +460,7 @@ impl Manager for AppManager {
         // First, check if the user owns the list
         let owns_list = CheckListOwnership {
             username: username.to_string(),
-            id,
+            id: id.clone(),
         }
         .execute(&mut *tx)
         .await
@@ -471,7 +470,7 @@ impl Manager for AppManager {
             return Err(ManagerError::ListNotFound);
         }
 
-        DeleteTasksByList { list_id: id }
+        DeleteTasksByList { list_id: id.clone() }
             .execute(&mut *tx)
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
@@ -494,7 +493,7 @@ impl Manager for AppManager {
     async fn duplicate_list(
         &self,
         username: &str,
-        id: Uuid,
+        id: String,
         new_name: &str,
     ) -> Result<Domain::List, ManagerError> {
         let mut tx = self
@@ -505,7 +504,7 @@ impl Manager for AppManager {
 
         let owns_list = CheckListOwnership {
             username: username.to_string(),
-            id,
+            id: id.clone(),
         }
         .execute(&mut *tx)
         .await
@@ -523,10 +522,10 @@ impl Manager for AppManager {
         .map_err(|_| ManagerError::DatabaseError)?;
 
         let position = max_pos + 1024.0;
-        let new_id = Uuid::new_v4();
+        let new_id = crate::handlers::util::id::generate_short_id();
 
         let new_list = CreateList {
-            id: new_id,
+            id: new_id.clone(),
             username: username.to_string(),
             name: new_name.to_string(),
             position,
@@ -544,10 +543,10 @@ impl Manager for AppManager {
         .map_err(|_| ManagerError::DatabaseError)?;
 
         for task in tasks {
-            let new_task_id = Uuid::new_v4();
+            let new_task_id = crate::handlers::util::id::generate_short_id();
             CreateTask {
                 id: new_task_id,
-                list_id: new_id,
+                list_id: new_id.clone(),
                 title: task.title,
                 points: task.points,
                 position: task.position,
@@ -566,8 +565,8 @@ impl Manager for AppManager {
     async fn reorder_lists(
         &self,
         username: &str,
-        active_id: Uuid,
-        over_id: Uuid,
+        active_id: String,
+        over_id: String,
     ) -> Result<Domain::List, ManagerError> {
         if active_id == over_id {
             return GetList {
@@ -637,14 +636,14 @@ impl Manager for AppManager {
     async fn reorder_tasks(
         &self,
         username: &str,
-        list_id: Uuid,
-        active_id: Uuid,
-        over_id: Uuid,
+        list_id: String,
+        active_id: String,
+        over_id: String,
     ) -> Result<Domain::Task, ManagerError> {
         if active_id == over_id {
             return UpdateTask {
                 username: username.to_string(),
-                list_id,
+                list_id: list_id.clone(),
                 task_id: active_id,
                 title: None,
                 completed: None,
@@ -662,7 +661,7 @@ impl Manager for AppManager {
 
         let tasks = GetTasks {
             username: username.to_string(),
-            list_id,
+            list_id: list_id.clone(),
         }
         .execute(&self.user_repo.pool)
         .await

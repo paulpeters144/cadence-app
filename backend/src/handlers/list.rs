@@ -8,7 +8,6 @@ use axum::{Json, extract::State};
 use axum_valid::Valid;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use validator::Validate;
 
 use crate::handlers::task::TaskResponse;
@@ -20,7 +19,7 @@ use crate::handlers::task::TaskResponse;
 #[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse {
-    pub id: Uuid,
+    pub id: String,
     pub name: String,
     pub journal: Option<String>,
     pub archived: bool,
@@ -50,7 +49,7 @@ pub const PATH_LISTS: &str = "/api/lists";
 
 #[derive(Deserialize, Validate)]
 pub struct ListQueryParams {
-    pub start_id: Option<Uuid>,
+    pub start_id: Option<String>,
     #[validate(range(max = 500, message = "Cannot take more than 500 lists"))]
     pub take: Option<i32>,
 }
@@ -86,7 +85,7 @@ pub async fn get_lists(
     let mut response = Vec::new();
     for list in lists {
         let tasks = manager
-            .get_tasks(&auth.username, list.id)
+            .get_tasks(&auth.username, list.id.clone())
             .await
             .unwrap_or_default();
         response.push(ListResponse::new(list, tasks));
@@ -171,7 +170,7 @@ pub struct UpdateListRequest {
 pub async fn update_list(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    axum::extract::Path(id): axum::extract::Path<Uuid>,
+    axum::extract::Path(id): axum::extract::Path<String>,
     Valid(Json(payload)): Valid<Json<UpdateListRequest>>,
 ) -> Result<Json<ListResponse>, AppError> {
     let list = manager
@@ -197,7 +196,7 @@ pub async fn update_list(
         })?;
 
     let tasks = manager
-        .get_tasks(&auth.username, list.id)
+        .get_tasks(&auth.username, list.id.clone())
         .await
         .unwrap_or_default();
 
@@ -228,7 +227,7 @@ pub async fn update_list(
 pub async fn delete_list(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    axum::extract::Path(id): axum::extract::Path<Uuid>,
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, AppError> {
     manager
         .delete_list(&auth.username, id)
@@ -275,7 +274,7 @@ pub struct DuplicateListRequest {
 pub async fn duplicate_list(
     State(manager): State<AppState>,
     auth: AuthenticatedUser,
-    axum::extract::Path(id): axum::extract::Path<Uuid>,
+    axum::extract::Path(id): axum::extract::Path<String>,
     Valid(Json(payload)): Valid<Json<DuplicateListRequest>>,
 ) -> Result<(axum::http::StatusCode, Json<ListResponse>), AppError> {
     let list = manager
@@ -289,7 +288,7 @@ pub async fn duplicate_list(
         })?;
 
     let tasks = manager
-        .get_tasks(&auth.username, list.id)
+        .get_tasks(&auth.username, list.id.clone())
         .await
         .unwrap_or_default();
 
@@ -307,8 +306,8 @@ pub const PATH_LISTS_REORDER: &str = "/api/lists/reorder";
 #[derive(Deserialize, Validate, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ListReorderRequest {
-    pub active_id: Uuid,
-    pub over_id: Uuid,
+    pub active_id: String,
+    pub over_id: String,
 }
 
 #[utoipa::path(
@@ -342,7 +341,7 @@ pub async fn reorder_lists(
         })?;
 
     let tasks = manager
-        .get_tasks(&auth.username, list.id)
+        .get_tasks(&auth.username, list.id.clone())
         .await
         .unwrap_or_default();
 

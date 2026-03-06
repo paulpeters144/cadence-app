@@ -1,14 +1,12 @@
 use std::future::Future;
 use sqlx::{Executor, Row, Sqlite};
 use sqlx::sqlite::SqliteRow;
-use uuid::Uuid;
 use crate::Domain;
 use crate::access::error::AccessError;
 use crate::access::traits::DbQuery;
 
 fn row_to_task(row: SqliteRow) -> Result<Domain::Task, AccessError> {
-    let id_str: String = row.get("id");
-    let id = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+    let id: String = row.get("id");
 
     let created_at_str: String = row.get("created_at");
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -36,8 +34,8 @@ fn row_to_task(row: SqliteRow) -> Result<Domain::Task, AccessError> {
 }
 
 pub struct CreateTask {
-    pub id: Uuid,
-    pub list_id: Uuid,
+    pub id: String,
+    pub list_id: String,
     pub title: String,
     pub points: Option<f32>,
     pub position: f32,
@@ -58,7 +56,7 @@ impl DbQuery for CreateTask {
         let position = self.position;
         let created_at = self.created_at;
         
-        let id = self.id;
+        let id = self.id.clone();
 
         async move {
             sqlx::query(
@@ -90,7 +88,7 @@ impl DbQuery for CreateTask {
 
 pub struct GetTasks {
     pub username: String,
-    pub list_id: Uuid,
+    pub list_id: String,
 }
 
 impl DbQuery for GetTasks {
@@ -124,13 +122,13 @@ impl DbQuery for GetTasks {
 
 pub struct UpdateTask {
     pub username: String,
-    pub list_id: Uuid,
-    pub task_id: Uuid,
+    pub list_id: String,
+    pub task_id: String,
     pub title: Option<String>,
     pub completed: Option<bool>,
     pub points: Option<f32>,
     pub position: Option<f32>,
-    pub new_list_id: Option<Uuid>,
+    pub new_list_id: Option<String>,
 }
 
 impl DbQuery for UpdateTask {
@@ -150,7 +148,7 @@ impl DbQuery for UpdateTask {
         let position = self.position;
         let completed_is_some = self.completed.is_some();
         
-        let new_list_id_str = self.new_list_id.map(|id| id.to_string());
+        let new_list_id_str = self.new_list_id.clone().map(|id| id.to_string());
         
         let task_id_str = self.task_id.to_string();
         let list_id_str = self.list_id.to_string();
@@ -194,8 +192,8 @@ impl DbQuery for UpdateTask {
 
 pub struct DeleteTask {
     pub username: String,
-    pub list_id: Uuid,
-    pub task_id: Uuid,
+    pub list_id: String,
+    pub task_id: String,
 }
 
 impl DbQuery for DeleteTask {
@@ -231,7 +229,7 @@ impl DbQuery for DeleteTask {
 }
 
 pub struct DeleteTasksByList {
-    pub list_id: Uuid,
+    pub list_id: String,
 }
 
 impl DbQuery for DeleteTasksByList {
@@ -256,7 +254,7 @@ impl DbQuery for DeleteTasksByList {
 }
 
 pub struct GetMaxTaskPosition {
-    pub list_id: Uuid,
+    pub list_id: String,
 }
 
 impl DbQuery for GetMaxTaskPosition {
@@ -282,8 +280,8 @@ impl DbQuery for GetMaxTaskPosition {
 
 pub struct CheckTaskExists {
     pub username: String,
-    pub list_id: Uuid,
-    pub task_id: Uuid,
+    pub list_id: String,
+    pub task_id: String,
 }
 
 impl DbQuery for CheckTaskExists {

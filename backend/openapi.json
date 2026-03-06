@@ -1092,12 +1092,10 @@
         ],
         "properties": {
           "activeId": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           },
           "overId": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           }
         }
       },
@@ -1122,8 +1120,7 @@
             "format": "date-time"
           },
           "id": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           },
           "journal": {
             "type": [
@@ -1184,8 +1181,7 @@
         ],
         "properties": {
           "fromListId": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           },
           "position": {
             "type": [
@@ -1195,8 +1191,7 @@
             "format": "float"
           },
           "toListId": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           }
         }
       },
@@ -1238,12 +1233,10 @@
         ],
         "properties": {
           "activeId": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           },
           "overId": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           }
         }
       },
@@ -1272,8 +1265,7 @@
             "format": "date-time"
           },
           "id": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           },
           "points": {
             "type": [
