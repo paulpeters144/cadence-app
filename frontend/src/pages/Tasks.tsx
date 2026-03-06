@@ -43,7 +43,7 @@ function DraggableTask({
 }: {
 	task: Task;
 	listId: string;
-	onToggle: (lid: string, tid: string) => void;
+	onToggle: (lid: string, tid: string, currentCompleted: boolean) => void;
 	onDelete: (lid: string, tid: string) => void;
 	onUpdatePoints: (lid: string, tid: string, p?: 0.5 | 1 | 2 | 3 | 5 | 8) => void;
 	onRename: (lid: string, tid: string, title: string) => void;
@@ -103,7 +103,7 @@ function DraggableTask({
 
 			<button
 				type="button"
-				onClick={() => !isArchived && onToggle(listId, task.id)}
+				onClick={() => !isArchived && onToggle(listId, task.id, task.completed)}
 				disabled={isArchived}
 				className={cn(
 					"shrink-0",
@@ -297,8 +297,8 @@ export default function Tasks() {
 		}
 	};
 
-	const handleToggleTask = (listId: string, taskId: string) => {
-		toggleTaskMutation.mutate({ listId, taskId });
+	const handleToggleTask = (listId: string, taskId: string, currentCompleted: boolean) => {
+		toggleTaskMutation.mutate({ listId, taskId, currentCompleted });
 	};
 
 	const handleDeleteTask = (listId: string, taskId: string) => {

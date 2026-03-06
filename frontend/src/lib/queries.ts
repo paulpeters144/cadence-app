@@ -405,12 +405,8 @@ export function useAddTaskMutation() {
 export function useToggleTaskMutation() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async ({ listId, taskId }: { listId: string; taskId: string }) => {
-			const lists = queryClient.getQueryData<List[]>(queryKeys.lists);
-			const list = lists?.find((l) => l.id === listId);
-			const task = list?.tasks.find((t) => t.id === taskId);
-			const newCompleted = !task?.completed;
-			return api.toggleTask(listId, taskId, newCompleted);
+		mutationFn: async ({ listId, taskId, currentCompleted }: { listId: string; taskId: string; currentCompleted: boolean }) => {
+			return api.toggleTask(listId, taskId, !currentCompleted);
 		},
 		onMutate: async ({ listId, taskId }) => {
 			await queryClient.cancelQueries({ queryKey: queryKeys.lists });
