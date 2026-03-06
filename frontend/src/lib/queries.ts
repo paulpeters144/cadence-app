@@ -69,6 +69,7 @@ export function useAddListMutation() {
 						name,
 						tasks: [],
 						archived: false,
+						position: 0,
 					},
 				];
 			});
@@ -378,10 +379,11 @@ export function useAddTaskMutation() {
 				return old.map((l) => {
 					if (l.id !== listId) return l;
 					const newTask: Task = {
-						id: `temp-${crypto.randomUUID()}`,
+						id: crypto.randomUUID(),
 						title,
 						completed: false,
 						createdAt: new Date().toISOString(),
+						position: 0,
 					};
 					return { ...l, tasks: [...l.tasks, newTask] };
 				});
@@ -403,8 +405,13 @@ export function useAddTaskMutation() {
 export function useToggleTaskMutation() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({ listId, taskId }: { listId: string; taskId: string }) =>
-			api.toggleTask(listId, taskId),
+		mutationFn: async ({ listId, taskId }: { listId: string; taskId: string }) => {
+			const lists = queryClient.getQueryData<List[]>(queryKeys.lists);
+			const list = lists?.find((l) => l.id === listId);
+			const task = list?.tasks.find((t) => t.id === taskId);
+			const newCompleted = !task?.completed;
+			return api.toggleTask(listId, taskId, newCompleted);
+		},
 		onMutate: async ({ listId, taskId }) => {
 			await queryClient.cancelQueries({ queryKey: queryKeys.lists });
 			const previousLists = queryClient.getQueryData<List[]>(queryKeys.lists);

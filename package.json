@@ -4,11 +4,18 @@
   "private": true,
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "cd backend ; cargo run --bin backend",
+    "dev": "tsx scripts/dev.ts",
     "build:frontend": "pnpm --filter frontend build",
     "cdk:diff:uat": "pnpm --filter infra cdk:diff:uat",
     "cdk:deploy:uat": "pnpm --filter infra cdk:deploy:uat",
-    "generate:api": "cd backend && cargo run --bin export_openapi",
+    "generate:api": "cd backend ; cargo run --bin export_openapi",
     "generate:types": "pnpm --filter frontend generate-types",
-    "generate": "pnpm run generate:api && pnpm run generate:types"
+    "generate": "pnpm run generate:api ; pnpm run generate:types"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.21.0"
   }
 }

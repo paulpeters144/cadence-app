@@ -230,6 +230,7 @@ export interface components {
             name: string;
             /** Format: float */
             position: number;
+            tasks: components["schemas"]["TaskResponse"][];
         };
         LoginRequest: {
             password: string;

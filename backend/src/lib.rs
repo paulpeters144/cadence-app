@@ -59,7 +59,14 @@ pub type AppState = Arc<dyn Manager>;
 )]
 pub struct ApiDoc;
 
+use tower_http::cors::{Any, CorsLayer};
+
 pub fn app(state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route(health::PATH_HEALTH, get(health::health))
         .route(user::PATH_LOGIN, post(user::login))
@@ -87,4 +94,5 @@ pub fn app(state: AppState) -> Router {
         .route(task::PATH_TASK_MOVE, post(task::move_task))
         .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
+        .layer(cors)
 }

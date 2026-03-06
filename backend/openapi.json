@@ -1107,7 +1107,8 @@
           "id",
           "name",
           "archived",
-          "position"
+          "position",
+          "tasks"
         ],
         "properties": {
           "archived": {
@@ -1136,6 +1137,12 @@
           "position": {
             "type": "number",
             "format": "float"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskResponse"
+            }
           }
         }
       },

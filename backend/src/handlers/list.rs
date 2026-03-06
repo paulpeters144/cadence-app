@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::handlers::task::TaskResponse;
+
 // -----------------------------------------------------------------------------
 // RESPONSE SCHEMAS (SHARED)
 // -----------------------------------------------------------------------------
@@ -24,10 +26,11 @@ pub struct ListResponse {
     pub archived: bool,
     pub archived_at: Option<DateTime<Utc>>,
     pub position: f32,
+    pub tasks: Vec<TaskResponse>,
 }
 
-impl From<Domain::List> for ListResponse {
-    fn from(list: Domain::List) -> Self {
+impl ListResponse {
+    pub fn new(list: Domain::List, tasks: Vec<Domain::Task>) -> Self {
         Self {
             id: list.id,
             name: list.name,
@@ -35,6 +38,7 @@ impl From<Domain::List> for ListResponse {
             archived: list.archived,
             archived_at: list.archived_at,
             position: list.position,
+            tasks: tasks.into_iter().map(TaskResponse::from).collect(),
         }
     }
 }
@@ -79,7 +83,16 @@ pub async fn get_lists(
         .await
         .map_err(|_| AppError::InternalServerError("Failed to fetch lists".to_string()))?;
 
-    Ok(Json(lists.into_iter().map(ListResponse::from).collect()))
+    let mut response = Vec::new();
+    for list in lists {
+        let tasks = manager
+            .get_tasks(&auth.username, list.id)
+            .await
+            .unwrap_or_default();
+        response.push(ListResponse::new(list, tasks));
+    }
+
+    Ok(Json(response))
 }
 
 // -----------------------------------------------------------------------------
@@ -118,7 +131,7 @@ pub async fn create_list(
 
     Ok((
         axum::http::StatusCode::CREATED,
-        Json(ListResponse::from(list)),
+        Json(ListResponse::new(list, vec![])),
     ))
 }
 
@@ -183,7 +196,12 @@ pub async fn update_list(
             _ => AppError::InternalServerError("Failed to update list".to_string()),
         })?;
 
-    Ok(Json(ListResponse::from(list)))
+    let tasks = manager
+        .get_tasks(&auth.username, list.id)
+        .await
+        .unwrap_or_default();
+
+    Ok(Json(ListResponse::new(list, tasks)))
 }
 
 // -----------------------------------------------------------------------------
@@ -270,9 +288,14 @@ pub async fn duplicate_list(
             _ => AppError::InternalServerError("Failed to duplicate list".to_string()),
         })?;
 
+    let tasks = manager
+        .get_tasks(&auth.username, list.id)
+        .await
+        .unwrap_or_default();
+
     Ok((
         axum::http::StatusCode::CREATED,
-        Json(ListResponse::from(list)),
+        Json(ListResponse::new(list, tasks)),
     ))
 }
 
@@ -318,5 +341,10 @@ pub async fn reorder_lists(
             _ => AppError::InternalServerError("Failed to reorder lists".to_string()),
         })?;
 
-    Ok(Json(ListResponse::from(list)))
+    let tasks = manager
+        .get_tasks(&auth.username, list.id)
+        .await
+        .unwrap_or_default();
+
+    Ok(Json(ListResponse::new(list, tasks)))
 }
