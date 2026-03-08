@@ -55,6 +55,7 @@ pub type AppState = Arc<dyn Manager>;
         task::MoveTaskRequest,
         task::TaskResponse,
         error::ErrorResponse,
+        health::HealthResponse,
     ))
 )]
 pub struct ApiDoc;
@@ -65,7 +66,7 @@ use std::env;
 
 pub fn app(state: AppState) -> Router {
     let frontend_url = env::var("FRONTEND_URL")
-        .expect("FRONTEND_URL must be set in the environment (e.g., CloudFront URL)");
+        .unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     let allowed_origins = [
         "http://localhost:3000".parse::<HeaderValue>().unwrap(),

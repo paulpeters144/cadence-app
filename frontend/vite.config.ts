@@ -10,4 +10,9 @@ export default defineConfig({
 			"@": path.resolve(import.meta.dirname, "./src"),
 		},
 	},
+	define: {
+		"import.meta.env.VITE_APP_BUILD_TIME": JSON.stringify(
+			new Date().toISOString().slice(0, 16),
+		),
+	},
 });

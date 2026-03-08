@@ -34,3 +34,6 @@ tokio = { version = "1.49.0", features = ["full"] }
 
 [features]
 lambda = ["lambda_http"]
+
+[build-dependencies]
+chrono = "0.4.44"
