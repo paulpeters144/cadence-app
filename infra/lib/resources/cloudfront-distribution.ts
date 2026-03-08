@@ -33,6 +33,11 @@ export class CloudfrontDist {
           responseHttpStatus: 200,
           responsePagePath: "/index.html",
         },
+        {
+          httpStatus: 403,
+          responseHttpStatus: 200,
+          responsePagePath: "/index.html",
+        },
       ],
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       enabled: true,

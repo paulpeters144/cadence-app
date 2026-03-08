@@ -14,10 +14,10 @@ export class S3WebApp {
     const bucketName = `${appName}-${stage}-web-app`;
     this.resource = new cdk.aws_s3.Bucket(construct, bucketName, {
       bucketName,
-      websiteIndexDocument: "index.html",
-      websiteErrorDocument: "index.html", // SPA fallback
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+      blockPublicAccess: cdk.aws_s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
     });
 
     const deploymentName = `${appName}-${stage}-web-deployment`;

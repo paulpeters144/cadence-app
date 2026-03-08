@@ -39,18 +39,18 @@ export class InfraStack extends cdk.Stack {
     });
 
     // 4. S3 Bucket for Frontend App
-    new resource.S3WebApp({
+    const s3WebApp = new resource.S3WebApp({
       construct: this,
       appName,
       stage,
     });
 
     // 5. CloudFront Distribution
-    // new resource.CloudfrontDist({
-    //   construct: this,
-    //   appName,
-    //   stage,
-    //   webAppBucket: s3WebApp.resource,
-    // });
+    new resource.CloudfrontDist({
+      construct: this,
+      appName,
+      stage,
+      webAppBucket: s3WebApp.resource,
+    });
   }
 }
