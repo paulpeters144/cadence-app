@@ -1,6 +1,6 @@
 # Lambda Monolith (Lambdalith) Migration Plan
 
-This plan outlines the steps to convert the existing Axum-based backend into a Lambda-compatible monolith using `lambda-http` and implementing the S3-SQLite synchronization protocol.
+This plan outlines the steps to convert the existing Axum-based backend into a Lambda-compatible monolith using `lambda-http` and connecting to a Turso database.
 
 ## Phase 1: Environment & Tooling
 
@@ -21,48 +21,37 @@ Update `Cargo.toml` with the following additions:
 [dependencies]
 # Existing dependencies...
 lambda_http = "0.13"
-aws-config = "1.1"
-aws-sdk-s3 = "1.1"
 # Ensure tower has required features for service adaptation
 tower = { version = "0.5.3", features = ["util", "make"] }
 ```
+*(Note: AWS SDK dependencies for S3 are no longer needed as Turso handles database synchronization.)*
 
-## Phase 3: State Management & Sync Logic
-
-### 3.1. Implement `is_dirty` in `AppManager`
-- Add `is_dirty: Arc<AtomicBool>` to `AppManager` and `Manager` trait (or provide a way to check/reset it).
-- Update all mutating methods in `AppManager` (e.g., `create_list`, `update_task`, `register`, etc.) to set `is_dirty` to `true` upon success.
-
-### 3.2. S3-SQLite Sync Module
-Create a utility to handle:
-- **Ingress**: `GET` SQLite file from S3 to `/tmp/database.db` on cold start or if ETag mismatches.
-- **Egress**: `PUT` SQLite file to S3 if `is_dirty` is true.
-
-## Phase 4: Lambda Adaptation (`src/main.rs`)
+## Phase 3: Lambda Adaptation (`src/main.rs`)
 
 Replace the existing `main` function with a Lambda-compatible one:
 
 1.  **Initialization (Outside `run`)**:
     - Setup Tracing.
-    - Initialize S3 Client.
-    - Perform **Ingress Sync**: Fetch the latest SQLite DB from S3 to `/tmp`.
-    - Initialize `AppRepository` pointing to `sqlite:/tmp/database.db`.
+    - Initialize `AppRepository` pointing to the Turso database.
     - Initialize `AppManager` and Axum `Router`.
 
 2.  **Lambda Loop**:
     - Use `lambda_http::run(app).await`.
-    - **Crucial**: Since `lambda_http::run` takes control, we need to wrap the Axum router in a custom `Tower` middleware or use a hook to perform the **Egress Sync** after the response is generated but before the Lambda freezes.
-    - *Alternative*: Wrap the `Router` in a layer that checks the `is_dirty` flag and performs S3 upload before returning the response.
+    - `lambda_http::run` takes control of the execution loop to handle incoming Lambda events and pass them to the Axum router.
 
-## Phase 5: Local Development
+## Phase 4: Local Development
 
 1.  **Local Emulator**:
     ```powershell
     cargo lambda watch
     ```
-2.  **Mock S3**: For local development, use a local file system or a mock S3 (like MinIO or LocalStack) if full sync testing is needed.
+2.  **Environment Variables**: Ensure `.env` contains:
+    ```env
+    TURSO_DATABASE_URL=libsql://your-database-url.turso.io
+    TURSO_AUTH_TOKEN=your_auth_token
+    ```
 
-## Phase 6: Build & Deployment
+## Phase 5: Build & Deployment
 
 1.  **Build**:
     ```powershell
@@ -73,12 +62,13 @@ Replace the existing `main` function with a Lambda-compatible one:
     cargo lambda deploy --enable-function-url backend
     ```
 3.  **Infrastructure Configuration**:
-    - Set `DATABASE_URL` to `sqlite:/tmp/database.db`.
-    - Set `S3_BUCKET_NAME` and `S3_KEY_NAME`.
-    - **IMPORTANT**: Set `Reserved Concurrency = 1` in AWS Lambda settings to prevent race conditions.
+    - Set environment variables in AWS Lambda:
+      - `TURSO_DATABASE_URL` (Turso connection URL)
+      - `TURSO_AUTH_TOKEN`
+      - `JWT_SECRET`
 
-## Phase 7: Verification
+## Phase 6: Verification
 
 1.  Test all endpoints via the Lambda Function URL.
-2.  Verify that SQLite changes persist across Lambda cold starts by checking the S3 bucket.
-3.  Check CloudWatch logs for sync duration and errors.
+2.  Verify that data is correctly persisting to the Turso database.
+3.  Check CloudWatch logs for any initialization or connection errors.

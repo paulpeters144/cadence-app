@@ -4,10 +4,11 @@
 /target/
 
 # Assets/DB
-cadence.db
-cadence.db-journal
-cadence.db-shm
-cadence.db-wal
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.db-info
 
 # Environment
 .env

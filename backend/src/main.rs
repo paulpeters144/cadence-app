@@ -10,12 +10,10 @@ async fn main() {
 
     let router: Router;
     {
-        let db_url =
-            std::env::var("DATABASE_URL").expect("DATABASE_URL not set in the environment");
         let jwt_secret =
             std::env::var("JWT_SECRET").expect("JWT_SECRET not set in the environment");
 
-        let repo = AppRepository::new(&db_url).await;
+        let repo = AppRepository::new().await;
         repo.init().await.expect("Failed to initialize database");
 
         let user_repo = Arc::new(repo);

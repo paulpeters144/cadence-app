@@ -12,8 +12,7 @@ use std::sync::Arc;
 use tower::ServiceExt;
 
 pub async fn setup_app() -> Router {
-    let db_url = "sqlite::memory:";
-    let repo = AppRepository::new(db_url).await;
+    let repo = AppRepository::new_in_memory().await;
     repo.init().await.expect("Failed to init DB");
 
     let repo = Arc::new(repo);

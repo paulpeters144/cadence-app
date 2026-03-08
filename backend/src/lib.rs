@@ -67,11 +67,15 @@ pub fn app(state: AppState) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    Router::new()
+    let openapi_doc = ApiDoc::openapi();
+
+    let mut router = Router::new()
         .route(health::PATH_HEALTH, get(health::health))
         .route(user::PATH_LOGIN, post(user::login))
         .route(user::PATH_REGISTER, post(user::register))
-        .route(user::PATH_ME, get(user::get_me))
+        .route(user::PATH_ME, get(user::get_me));
+
+    router = router
         .route(
             list::PATH_LISTS,
             post(list::create_list).get(list::get_lists),
@@ -81,7 +85,9 @@ pub fn app(state: AppState) -> Router {
             axum::routing::patch(list::update_list).delete(list::delete_list),
         )
         .route(list::PATH_LIST_DUPLICATE, post(list::duplicate_list))
-        .route(list::PATH_LISTS_REORDER, post(list::reorder_lists))
+        .route(list::PATH_LISTS_REORDER, post(list::reorder_lists));
+
+    router = router
         .route(
             task::PATH_TASKS,
             post(task::create_task).get(task::get_tasks),
@@ -91,8 +97,10 @@ pub fn app(state: AppState) -> Router {
             axum::routing::patch(task::update_task).delete(task::delete_task),
         )
         .route(task::PATH_TASKS_REORDER, post(task::reorder_tasks))
-        .route(task::PATH_TASK_MOVE, post(task::move_task))
-        .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .route(task::PATH_TASK_MOVE, post(task::move_task));
+
+    router
+        .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", openapi_doc))
         .with_state(state)
         .layer(cors)
 }

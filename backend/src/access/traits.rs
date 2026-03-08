@@ -17,19 +17,38 @@ pub struct UpdateTaskParams {
     pub position: Option<f32>,
 }
 
+pub enum DbExecutor<'a> {
+    Connection(&'a libsql::Connection),
+    Transaction(&'a libsql::Transaction),
+}
+
+impl<'a> DbExecutor<'a> {
+    pub async fn query(&self, sql: &str, params: impl libsql::params::IntoParams) -> Result<libsql::Rows, libsql::Error> {
+        match self {
+            DbExecutor::Connection(c) => c.query(sql, params).await,
+            DbExecutor::Transaction(t) => t.query(sql, params).await,
+        }
+    }
+
+    pub async fn execute(&self, sql: &str, params: impl libsql::params::IntoParams) -> Result<u64, libsql::Error> {
+        match self {
+            DbExecutor::Connection(c) => c.execute(sql, params).await,
+            DbExecutor::Transaction(t) => t.execute(sql, params).await,
+        }
+    }
+}
+
 pub trait DbQuery: Send + Sync {
     type Response;
     
-    fn execute<'e, E>(
+    fn execute<'e>(
         &self,
-        executor: E,
-    ) -> impl std::future::Future<Output = Result<Self::Response, AccessError>> + Send
-    where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>;
+        executor: &'e DbExecutor<'e>,
+    ) -> impl std::future::Future<Output = Result<Self::Response, AccessError>> + Send;
 }
 
 pub trait TransactionalRepository: Send + Sync {
     fn begin_transaction(
         &self,
-    ) -> impl std::future::Future<Output = Result<sqlx::Transaction<'static, sqlx::Sqlite>, AccessError>> + Send;
+    ) -> impl std::future::Future<Output = Result<libsql::Transaction, AccessError>> + Send;
 }

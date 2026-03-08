@@ -1,7 +1,6 @@
 use super::AppRepository;
 use crate::access::error::AccessError;
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, sqlite::SqliteRow};
 use std::future::Future;
 use uuid::Uuid;
 
@@ -31,14 +30,17 @@ pub enum UserQueryResult {
     Success,
 }
 
-fn row_to_user(row: SqliteRow) -> Result<UserQueryResult, AccessError> {
-    let id_str: String = row.get("id");
+fn row_to_user(row: libsql::Row) -> Result<UserQueryResult, AccessError> {
+    let id_str: String = row.get(0).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
     let id: Uuid = Uuid::parse_str(&id_str).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+    let username: String = row.get(1).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+    let password_hash: String = row.get(2).map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
     Ok(UserQueryResult::User {
         id,
-        username: row.get("username"),
-        password_hash: row.get("password_hash"),
+        username,
+        password_hash,
     })
 }
 
@@ -50,21 +52,21 @@ impl UserRepository for AppRepository {
     async fn execute(&self, query: UserQuery) -> Result<UserQueryResult, AccessError> {
         match query {
             UserQuery::Get(id) => {
-                let row = sqlx::query("SELECT id, username, password_hash FROM users WHERE id = ?")
-                    .bind(id.to_string())
-                    .fetch_optional(&self.pool)
+                let mut rows = self.conn.query("SELECT id, username, password_hash FROM users WHERE id = ?", libsql::params![id.to_string()])
                     .await
-                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+                let row = rows.next().await.map_err(|e| AccessError::DatabaseError(e.to_string()))?
                     .ok_or(AccessError::NotFound)?;
 
                 row_to_user(row)
             }
             UserQuery::GetByUsername(username) => {
-                let row = sqlx::query("SELECT id, username, password_hash FROM users WHERE username = ?")
-                    .bind(username)
-                    .fetch_optional(&self.pool)
+                let mut rows = self.conn.query("SELECT id, username, password_hash FROM users WHERE username = ?", libsql::params![username])
                     .await
-                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?
+                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+                let row = rows.next().await.map_err(|e| AccessError::DatabaseError(e.to_string()))?
                     .ok_or(AccessError::NotFound)?;
 
                 row_to_user(row)
@@ -74,19 +76,14 @@ impl UserRepository for AppRepository {
                 password_hash,
             } => {
                 let id = Uuid::new_v4().to_string();
-                sqlx::query("INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)")
-                    .bind(id)
-                    .bind(username)
-                    .bind(password_hash)
-                    .execute(&self.pool)
+                self.conn.execute("INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)", libsql::params![id, username, password_hash])
                     .await
                     .map_err(|e| {
-                        if let Some(sqe) = e.as_database_error()
-                            && sqe.is_unique_violation()
-                        {
+                        let err_str = e.to_string();
+                        if err_str.contains("UNIQUE constraint failed") || err_str.contains("UNIQUE") {
                             AccessError::AlreadyExists
                         } else {
-                            AccessError::DatabaseError(e.to_string())
+                            AccessError::DatabaseError(err_str)
                         }
                     })?;
                 Ok(UserQueryResult::Success)
@@ -96,36 +93,45 @@ impl UserRepository for AppRepository {
                 username,
                 password_hash,
             } => {
-                let mut qb = sqlx::QueryBuilder::new("UPDATE users SET ");
-                let mut separated = qb.separated(", ");
+                let mut sql = String::from("UPDATE users SET ");
+                let mut set_clauses = Vec::new();
+                let mut params_user = None;
+                let mut params_hash = None;
+
                 if let Some(u) = username {
-                    separated.push("username = ").push_bind(u);
+                    set_clauses.push("username = ?");
+                    params_user = Some(u);
                 }
                 if let Some(p) = password_hash {
-                    separated.push("password_hash = ").push_bind(p);
+                    set_clauses.push("password_hash = ?");
+                    params_hash = Some(p);
                 }
 
-                qb.push(" WHERE id = ").push_bind(id.to_string());
+                if set_clauses.is_empty() {
+                    return Ok(UserQueryResult::Success);
+                }
 
-                let res = qb
-                    .build()
-                    .execute(&self.pool)
-                    .await
-                    .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+                sql.push_str(&set_clauses.join(", "));
+                sql.push_str(" WHERE id = ?");
 
-                if res.rows_affected() == 0 {
+                let res = match (params_user, params_hash) {
+                    (Some(u), Some(p)) => self.conn.execute(&sql, libsql::params![u, p, id.to_string()]).await,
+                    (Some(u), None) => self.conn.execute(&sql, libsql::params![u, id.to_string()]).await,
+                    (None, Some(p)) => self.conn.execute(&sql, libsql::params![p, id.to_string()]).await,
+                    (None, None) => Ok(0),
+                }.map_err(|e| AccessError::DatabaseError(e.to_string()))?;
+
+                if res == 0 {
                     return Err(AccessError::NotFound);
                 }
                 Ok(UserQueryResult::Success)
             }
             UserQuery::Delete(id) => {
-                let res = sqlx::query("DELETE FROM users WHERE id = ?")
-                    .bind(id.to_string())
-                    .execute(&self.pool)
+                let res = self.conn.execute("DELETE FROM users WHERE id = ?", libsql::params![id.to_string()])
                     .await
                     .map_err(|e| AccessError::DatabaseError(e.to_string()))?;
 
-                if res.rows_affected() == 0 {
+                if res == 0 {
                     return Err(AccessError::NotFound);
                 }
                 Ok(UserQueryResult::Success)

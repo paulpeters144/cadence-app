@@ -7,7 +7,7 @@ use crate::access::task::{
     UpdateTask,
 };
 use crate::access::{
-    AccessError, AppRepository, DbQuery, TransactionalRepository, UpdateListParams,
+    AccessError, AppRepository, DbExecutor, DbQuery, TransactionalRepository, UpdateListParams,
     UpdateTaskParams, UserQuery, UserQueryResult, UserRepository,
 };
 use crate::constants::JWT_EXPIRY_SECONDS;
@@ -218,10 +218,11 @@ impl Manager for AppManager {
     }
 
     async fn create_list(&self, username: &str, name: &str) -> Result<Domain::List, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         let max_pos = GetMaxListPosition {
             username: username.to_string(),
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -234,7 +235,7 @@ impl Manager for AppManager {
             name: name.to_string(),
             position,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)
     }
@@ -245,12 +246,13 @@ impl Manager for AppManager {
         start_id: Option<String>,
         take: Option<i32>,
     ) -> Result<Vec<Domain::List>, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         GetLists {
             username: username.to_string(),
             start_id,
             take,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)
     }
@@ -261,6 +263,7 @@ impl Manager for AppManager {
         id: String,
         params: UpdateListParams,
     ) -> Result<Domain::List, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         UpdateList {
             username: username.to_string(),
             id,
@@ -269,7 +272,7 @@ impl Manager for AppManager {
             archived: params.archived,
             position: params.position,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|e| match e {
             AccessError::NotFound => ManagerError::ListNotFound,
@@ -284,11 +287,12 @@ impl Manager for AppManager {
         title: &str,
         points: Option<f32>,
     ) -> Result<Domain::Task, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         let owns_list = CheckListOwnership {
             username: username.to_string(),
             id: list_id.clone(),
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -297,7 +301,7 @@ impl Manager for AppManager {
         }
 
         let max_pos = GetMaxTaskPosition { list_id: list_id.clone() }
-            .execute(&self.user_repo.pool)
+            .execute(&exec)
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -313,7 +317,7 @@ impl Manager for AppManager {
             position,
             created_at,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)
     }
@@ -323,11 +327,12 @@ impl Manager for AppManager {
         username: &str,
         list_id: String,
     ) -> Result<Vec<Domain::Task>, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         GetTasks {
             username: username.to_string(),
             list_id,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)
     }
@@ -339,6 +344,7 @@ impl Manager for AppManager {
         task_id: String,
         params: UpdateTaskParams,
     ) -> Result<Domain::Task, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         UpdateTask {
             username: username.to_string(),
             list_id,
@@ -349,7 +355,7 @@ impl Manager for AppManager {
             position: params.position,
             new_list_id: None,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|e| match e {
             AccessError::NotFound => ManagerError::TaskNotFound,
@@ -365,18 +371,20 @@ impl Manager for AppManager {
         to_list_id: String,
         position: Option<f32>,
     ) -> Result<Domain::Task, ManagerError> {
-        let mut tx = self
+        let tx = self
             .user_repo
             .begin_transaction()
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
+
+        let exec = DbExecutor::Transaction(&tx);
 
         let task_exists = CheckTaskExists {
             username: username.to_string(),
             list_id: from_list_id.clone(),
             task_id: task_id.clone(),
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -388,7 +396,7 @@ impl Manager for AppManager {
             username: username.to_string(),
             id: to_list_id.clone(),
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -402,7 +410,7 @@ impl Manager for AppManager {
                 let max_pos = GetMaxTaskPosition {
                     list_id: to_list_id.clone(),
                 }
-                .execute(&mut *tx)
+                .execute(&exec)
                 .await
                 .map_err(|_| ManagerError::DatabaseError)?;
                 max_pos + 1024.0
@@ -419,7 +427,7 @@ impl Manager for AppManager {
             position: Some(new_position),
             new_list_id: Some(to_list_id),
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|e| match e {
             AccessError::NotFound => ManagerError::TaskNotFound,
@@ -437,12 +445,13 @@ impl Manager for AppManager {
         list_id: String,
         task_id: String,
     ) -> Result<(), ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         DeleteTask {
             username: username.to_string(),
             list_id,
             task_id,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|e| match e {
             AccessError::NotFound => ManagerError::TaskNotFound,
@@ -451,18 +460,20 @@ impl Manager for AppManager {
     }
 
     async fn delete_list(&self, username: &str, id: String) -> Result<(), ManagerError> {
-        let mut tx = self
+        let tx = self
             .user_repo
             .begin_transaction()
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
+
+        let exec = DbExecutor::Transaction(&tx);
 
         // First, check if the user owns the list
         let owns_list = CheckListOwnership {
             username: username.to_string(),
             id: id.clone(),
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -471,7 +482,7 @@ impl Manager for AppManager {
         }
 
         DeleteTasksByList { list_id: id.clone() }
-            .execute(&mut *tx)
+            .execute(&exec)
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -479,7 +490,7 @@ impl Manager for AppManager {
             username: username.to_string(),
             id,
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|e| match e {
             AccessError::NotFound => ManagerError::ListNotFound,
@@ -496,17 +507,19 @@ impl Manager for AppManager {
         id: String,
         new_name: &str,
     ) -> Result<Domain::List, ManagerError> {
-        let mut tx = self
+        let tx = self
             .user_repo
             .begin_transaction()
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
 
+        let exec = DbExecutor::Transaction(&tx);
+
         let owns_list = CheckListOwnership {
             username: username.to_string(),
             id: id.clone(),
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -517,7 +530,7 @@ impl Manager for AppManager {
         let max_pos = GetMaxListPosition {
             username: username.to_string(),
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -530,7 +543,7 @@ impl Manager for AppManager {
             name: new_name.to_string(),
             position,
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -538,7 +551,7 @@ impl Manager for AppManager {
             username: username.to_string(),
             list_id: id,
         }
-        .execute(&mut *tx)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -552,7 +565,7 @@ impl Manager for AppManager {
                 position: task.position,
                 created_at: chrono::Utc::now(),
             }
-            .execute(&mut *tx)
+            .execute(&exec)
             .await
             .map_err(|_| ManagerError::DatabaseError)?;
         }
@@ -568,12 +581,13 @@ impl Manager for AppManager {
         active_id: String,
         over_id: String,
     ) -> Result<Domain::List, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         if active_id == over_id {
             return GetList {
                 username: username.to_string(),
                 id: active_id,
             }
-            .execute(&self.user_repo.pool)
+            .execute(&exec)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::ListNotFound,
@@ -586,7 +600,7 @@ impl Manager for AppManager {
             start_id: None,
             take: Some(1000),
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -625,7 +639,7 @@ impl Manager for AppManager {
             archived: None,
             position: Some(new_position),
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|e| match e {
             AccessError::NotFound => ManagerError::ListNotFound,
@@ -640,6 +654,7 @@ impl Manager for AppManager {
         active_id: String,
         over_id: String,
     ) -> Result<Domain::Task, ManagerError> {
+        let exec = DbExecutor::Connection(&self.user_repo.conn);
         if active_id == over_id {
             return UpdateTask {
                 username: username.to_string(),
@@ -651,7 +666,7 @@ impl Manager for AppManager {
                 position: None,
                 new_list_id: None,
             }
-            .execute(&self.user_repo.pool)
+            .execute(&exec)
             .await
             .map_err(|e| match e {
                 AccessError::NotFound => ManagerError::TaskNotFound,
@@ -663,7 +678,7 @@ impl Manager for AppManager {
             username: username.to_string(),
             list_id: list_id.clone(),
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|_| ManagerError::DatabaseError)?;
 
@@ -704,7 +719,7 @@ impl Manager for AppManager {
             position: Some(new_position),
             new_list_id: None,
         }
-        .execute(&self.user_repo.pool)
+        .execute(&exec)
         .await
         .map_err(|e| match e {
             AccessError::NotFound => ManagerError::TaskNotFound,

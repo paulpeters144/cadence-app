@@ -5,55 +5,62 @@ pub mod traits;
 pub mod user;
 
 pub use error::AccessError;
-pub use traits::{DbQuery, TransactionalRepository, UpdateListParams, UpdateTaskParams};
+pub use traits::{DbExecutor, DbQuery, TransactionalRepository, UpdateListParams, UpdateTaskParams};
 pub use user::{UserRepository, UserQuery, UserQueryResult};
 
-use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
+use libsql::{Builder, Connection};
 
 #[derive(Clone)]
 pub struct AppRepository {
-    pub(crate) pool: SqlitePool,
+    pub(crate) conn: Connection,
 }
 
 impl traits::TransactionalRepository for AppRepository {
     async fn begin_transaction(
         &self,
-    ) -> Result<sqlx::Transaction<'static, sqlx::Sqlite>, AccessError> {
-        self.pool.begin().await.map_err(|e| AccessError::DatabaseError(e.to_string()))
+    ) -> Result<libsql::Transaction, AccessError> {
+        self.conn.transaction().await.map_err(|e| AccessError::DatabaseError(e.to_string()))
     }
 }
 
 impl AppRepository {
-    pub async fn new(database_url: &str) -> Self {
-        let path = database_url.strip_prefix("sqlite:");
-
-        let needs_file_creation = |p: &str| p != ":memory:" && !std::path::Path::new(p).exists();
-
-        if path.is_some_and(needs_file_creation) {
-            tokio::fs::File::create(path.unwrap()).await.unwrap();
+    pub async fn new() -> Self {
+        let database_url = std::env::var("TURSO_DATABASE_URL").expect("TURSO_DATABASE_URL must be set");
+        let auth_token = std::env::var("TURSO_AUTH_TOKEN").unwrap_or_default();
+        
+        if auth_token.is_empty() {
+            panic!("TURSO_AUTH_TOKEN is required for remote database");
         }
 
-        let pool = SqlitePoolOptions::new()
-            .max_connections(2)
-            .connect(database_url)
+        let db = Builder::new_remote(database_url, auth_token)
+            .build()
             .await
-            .expect("Failed to connect to SQLite");
+            .expect("Failed to build remote libsql connection");
 
-        Self { pool }
+        let conn = db.connect().unwrap();
+        Self { conn }
     }
 
-    pub async fn init(&self) -> Result<(), sqlx::Error> {
-        sqlx::query(
+    pub async fn new_in_memory() -> Self {
+        let db = Builder::new_local(":memory:")
+            .build()
+            .await
+            .expect("Failed to build in-memory libsql connection");
+        let conn = db.connect().unwrap();
+        Self { conn }
+    }
+
+    pub async fn init(&self) -> Result<(), libsql::Error> {
+        self.conn.execute(
             "CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL COLLATE NOCASE,
                 password_hash TEXT NOT NULL
-            );",
+            );", ()
         )
-        .execute(&self.pool)
         .await?;
 
-        sqlx::query(
+        self.conn.execute(
             "CREATE TABLE IF NOT EXISTS lists (
                 id TEXT PRIMARY KEY,
                 username TEXT NOT NULL,
@@ -63,17 +70,15 @@ impl AppRepository {
                 archived_at TEXT,
                 position REAL NOT NULL DEFAULT 0,
                 FOREIGN KEY(username) REFERENCES users(username)
-            );",
+            );", ()
         )
-        .execute(&self.pool)
         .await?;
 
         // Add position column if it doesn't exist (for existing databases)
-        let _ = sqlx::query("ALTER TABLE lists ADD COLUMN position REAL NOT NULL DEFAULT 0")
-            .execute(&self.pool)
+        let _ = self.conn.execute("ALTER TABLE lists ADD COLUMN position REAL NOT NULL DEFAULT 0", ())
             .await;
 
-        sqlx::query(
+        self.conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks (
                 id TEXT PRIMARY KEY,
                 list_id TEXT NOT NULL,
@@ -84,14 +89,12 @@ impl AppRepository {
                 completed_at TEXT,
                 position REAL NOT NULL DEFAULT 0,
                 FOREIGN KEY(list_id) REFERENCES lists(id)
-            );",
+            );", ()
         )
-        .execute(&self.pool)
         .await?;
 
         // Add position column if it doesn't exist (for existing databases)
-        let _ = sqlx::query("ALTER TABLE tasks ADD COLUMN position REAL NOT NULL DEFAULT 0")
-            .execute(&self.pool)
+        let _ = self.conn.execute("ALTER TABLE tasks ADD COLUMN position REAL NOT NULL DEFAULT 0", ())
             .await;
 
         Ok(())
