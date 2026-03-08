@@ -1,0 +1,12 @@
+# CDK build artifacts
+cdk.out/
+node_modules/
+dist/
+*.js
+*.d.ts
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
