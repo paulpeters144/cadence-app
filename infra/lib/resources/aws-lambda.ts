@@ -16,7 +16,7 @@ export class AwsLambda {
 
     this.resource = new cdk.aws_lambda.Function(construct, apiLambdaName, {
       functionName: apiLambdaName,
-      timeout: cdk.Duration.seconds(8), // API Gateway max timeout is 29s
+      timeout: cdk.Duration.seconds(8),
       runtime: cdk.aws_lambda.Runtime.PROVIDED_AL2023,
       code: cdk.aws_lambda.Code.fromAsset("../backend/dist"),
       handler: "bootstrap", // Standard for Rust

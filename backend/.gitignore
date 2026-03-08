@@ -2,6 +2,7 @@
 
 # Build artifacts
 /target/
+/dist/
 
 # Assets/DB
 *.db
