@@ -60,10 +60,22 @@ pub type AppState = Arc<dyn Manager>;
 pub struct ApiDoc;
 
 use tower_http::cors::{Any, CorsLayer};
+use axum::http::HeaderValue;
+use std::env;
 
 pub fn app(state: AppState) -> Router {
+    let frontend_url = env::var("FRONTEND_URL")
+        .expect("FRONTEND_URL must be set in the environment (e.g., CloudFront URL)");
+
+    let allowed_origins = [
+        "http://localhost:3000".parse::<HeaderValue>().unwrap(),
+        frontend_url
+            .parse::<HeaderValue>()
+            .expect("FRONTEND_URL is not a valid HeaderValue"),
+    ];
+
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(allowed_origins)
         .allow_methods(Any)
         .allow_headers(Any);
 
