@@ -18,7 +18,7 @@ export class AwsLambda {
       functionName: apiLambdaName,
       timeout: cdk.Duration.seconds(8),
       runtime: cdk.aws_lambda.Runtime.PROVIDED_AL2023,
-      code: cdk.aws_lambda.Code.fromAsset("../backend/dist"),
+      code: cdk.aws_lambda.Code.fromAsset("../backend/target/lambda/backend/bootstrap.zip"),
       handler: "bootstrap", // Standard for Rust
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       memorySize: 512,
