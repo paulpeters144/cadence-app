@@ -12,10 +12,12 @@
     "generate:api": "cd backend ; cargo run --bin export_openapi",
     "generate:types": "pnpm --filter frontend generate-types",
     "generate": "pnpm run generate:api ; pnpm run generate:types",
-    "deploy:frontend": "tsx scripts/deploy-frontend.ts"
+    "deploy:frontend": "tsx scripts/deploy-frontend.ts",
+    "deploy:backend": "tsx scripts/deploy-backend.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-cloudfront": "^3.1004.0",
+    "@aws-sdk/client-lambda": "^3.1004.0",
     "@aws-sdk/client-s3": "^3.1004.0",
     "@types/node": "^25.3.5",
     "concurrently": "^9.2.1",
