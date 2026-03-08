@@ -29,3 +29,7 @@ Thumbs.db
 # Cargo
 # We keep Cargo.lock for applications to ensure reproducible builds
 # .cargo/config.toml # Uncomment if you have local-only runner configs
+
+# API Client (Bruno)
+docs/cadence-api/environments/*.bru
+!docs/cadence-api/environments/sample.bru

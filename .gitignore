@@ -59,3 +59,12 @@ coverage/
 # Common build artifacts
 build/
 out/
+
+# Linters / Formatters
+.eslintcache
+.biomecache
+
+# Rust Coverage
+tarpaulin-report.html
+cobertura.xml
+*.profraw

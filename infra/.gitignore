@@ -10,3 +10,6 @@ dist/
 .env
 .env.*
 !.env.example
+
+# AWS CDK Context (Prevents leaking AWS Account IDs)
+cdk.context.json
