@@ -78,7 +78,7 @@ export default function Login() {
 					</Button>
 				</form>
 				<p className="text-center text-xs text-muted-foreground">
-					This is a demo. Any username and password will work.
+					This is an app to measure your day to day cadence.
 				</p>
 			</div>
 		</div>

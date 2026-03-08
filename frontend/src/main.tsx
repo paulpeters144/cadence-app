@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import App from "./App.tsx";
+import App from "./App";
 
 // Simple build-time version log
 console.log(`🕒 Build Version: ${import.meta.env.VITE_APP_BUILD_TIME}`);

@@ -2,9 +2,8 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
-import { S3SyncClient } from 's3-sync-client';
 import * as mime from 'mime-types';
 
 // Load .env from the root
@@ -20,22 +19,47 @@ if (!BUCKET_NAME) {
   process.exit(1);
 }
 
-if (!API_URL) {
-  console.warn("⚠️ VITE_API_BASE_URL is not defined in the root .env file. The build will use the default or current build-time value.");
-}
-
 const frontendDir = path.resolve(process.cwd(), 'frontend');
 const distDir = path.join(frontendDir, 'dist');
 
+async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
+  const files = fs.readdirSync(dirPath);
+
+  for (const file of files) {
+    if (fs.statSync(path.join(dirPath, file)).isDirectory()) {
+      arrayOfFiles = await getAllFiles(path.join(dirPath, file), arrayOfFiles);
+    } else {
+      arrayOfFiles.push(path.join(dirPath, file));
+    }
+  }
+
+  return arrayOfFiles;
+}
+
+async function emptyS3Bucket(s3Client: S3Client, bucketName: string) {
+  const listParams = { Bucket: bucketName };
+  const listedObjects = await s3Client.send(new ListObjectsV2Command(listParams));
+
+  if (!listedObjects.Contents || listedObjects.Contents.length === 0) return;
+
+  const deleteParams = {
+    Bucket: bucketName,
+    Delete: { Objects: listedObjects.Contents.map(({ Key }) => ({ Key: Key! })) }
+  };
+
+  await s3Client.send(new DeleteObjectsCommand(deleteParams));
+
+  if (listedObjects.IsTruncated) await emptyS3Bucket(s3Client, bucketName);
+}
+
 async function main() {
-  console.log('🧹 Cleaning previous build...');
+  console.log('🧹 Cleaning local build directory...');
   if (fs.existsSync(distDir)) {
     fs.rmSync(distDir, { recursive: true, force: true });
-    console.log('✅ Build directory cleaned.');
+    console.log('✅ Local build directory cleaned.');
   }
 
   console.log('\n📦 Building frontend...');
-  // Execute the frontend build script
   execSync('pnpm --filter frontend build', { 
     stdio: 'inherit', 
     cwd: process.cwd(),
@@ -47,25 +71,54 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\n☁️ Deploying to S3 Bucket: ${BUCKET_NAME}...`);
   const s3Client = new S3Client({ region: REGION });
-  const syncClient = new S3SyncClient({ client: s3Client });
 
-  // Sync dist directory to S3 (with del: true to remove old files)
-  await syncClient.sync(distDir, `s3://${BUCKET_NAME}`, {
-    del: true,
-    getS3Params: (localFile: string) => ({
-      ContentType: mime.lookup(localFile) || 'application/octet-stream'
-    })
-  });
-  console.log('✅ S3 Sync Complete.');
+  console.log(`\n🗑️ Emptying S3 Bucket: ${BUCKET_NAME}...`);
+  await emptyS3Bucket(s3Client, BUCKET_NAME as string);
+  console.log('✅ S3 Bucket emptied.');
 
-  // Invalidate CloudFront cache if a distribution ID is provided
+  console.log(`\n☁️ Deploying files to S3...`);
+  const files = await getAllFiles(distDir);
+  
+  const authoritativeMimeTypes: Record<string, string> = {
+    '.js': 'application/javascript',
+    '.mjs': 'application/javascript',
+    '.css': 'text/css',
+    '.html': 'text/html',
+    '.htm': 'text/html',
+    '.json': 'application/json',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.ico': 'image/x-icon',
+    '.txt': 'text/plain',
+  };
+
+  for (const file of files) {
+    const relativePath = path.relative(distDir, file);
+    const s3Key = relativePath.replace(/\\/g, '/');
+    const extension = path.extname(s3Key).toLowerCase();
+    const contentType = authoritativeMimeTypes[extension] || (mime.lookup(s3Key) as string) || 'application/octet-stream';
+
+    console.log(`📡 Uploading ${s3Key} (${contentType})...`);
+    
+    const fileContent = fs.readFileSync(file);
+    await s3Client.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME as string,
+      Key: s3Key,
+      Body: fileContent,
+      ContentType: contentType,
+    }));
+  }
+  console.log('✅ S3 Upload Complete.');
+
   if (CLOUDFRONT_DIST_ID) {
     console.log(`\n🔄 Invalidating CloudFront Cache for ${CLOUDFRONT_DIST_ID}...`);
     const cfClient = new CloudFrontClient({ region: REGION });
     const invalidationParams = {
-      DistributionId: CLOUDFRONT_DIST_ID,
+      DistributionId: CLOUDFRONT_DIST_ID as string,
       InvalidationBatch: {
         CallerReference: Date.now().toString(),
         Paths: {
