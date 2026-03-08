@@ -1,26 +1,51 @@
-# Cadence
+# Cadence Frontend
 
-A personal productivity application focused on agile-style task management with points, performance tracking, and integrated journaling.
-
-## Features
-
-- **Agile Tasks**: Assign Fibonacci-style points (0.5, 1, 2, 3, 5, 8) to your tasks.
-- **Collections**: Organize tasks into lists (sprints).
-- **Dashboard**: Visualize your performance history and velocity.
-- **Journal**: Record wins, challenges, and notes for each collection.
-- **Archive**: Keep a history of your completed collections.
+A modern, responsive web application for managing your personal agile workflow. Built as a PWA for a seamless experience across devices.
 
 ## Tech Stack
 
-- React (TypeScript)
-- Vite
-- Tailwind CSS
-- React Query
-- Lucide Icons
-- DnD Kit for reordering
+- **Framework**: [React](https://react.dev/) (TypeScript)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
+- **State & Data**: [React Router v7](https://reactrouter.com/) + [TanStack Query](https://tanstack.com/query)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Drag & Drop**: [dnd kit](https://dndkit.com/)
+
+## Features
+
+- **PWA Support**: Installable on mobile and desktop with offline capabilities.
+- **Agile Workflow**: Points-based task management and sprint collections.
+- **Performance Tracking**: Visual dashboards for velocity and history.
+- **Journaling**: Capture notes and wins for every sprint.
 
 ## Getting Started
 
-1. Install dependencies: `npm install`
-2. Run development server: `npm run dev`
-3. Build for production: `npm run build`
+### Environment Variables
+
+Create a `.env` file:
+
+```env
+VITE_API_URL=http://localhost:3001
+```
+
+### Development
+
+```powershell
+pnpm run dev
+```
+
+### Building for Production
+
+```powershell
+pnpm run build
+```
+
+## Type Safety
+
+This project uses `openapi-typescript` to generate types from the backend's OpenAPI spec. To update types:
+
+1. Ensure the backend is running or export the `openapi.json`.
+2. Run:
+   ```powershell
+   pnpm run generate-types
+   ```
