@@ -61,13 +61,8 @@ pub type AppState = Arc<dyn Manager>;
 pub struct ApiDoc;
 
 use tower_http::cors::{Any, CorsLayer};
-use axum::http::HeaderValue;
-use std::env;
 
 pub fn app(state: AppState) -> Router {
-    let frontend_url = env::var("FRONTEND_URL")
-        .unwrap_or_else(|_| "http://localhost:3000".to_string());
-
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
