@@ -68,3 +68,7 @@ out/
 tarpaulin-report.html
 cobertura.xml
 *.profraw
+
+# API Clients
+**/docs/cadence-api/environments/*.bru
+!**/docs/cadence-api/environments/sample.bru
