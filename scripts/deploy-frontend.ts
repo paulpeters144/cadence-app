@@ -35,7 +35,11 @@ async function main() {
 
   console.log('\n📦 Building frontend...');
   // Execute the frontend build script
-  execSync('pnpm --filter frontend build', { stdio: 'inherit', cwd: process.cwd() });
+  execSync('pnpm --filter frontend build', { 
+    stdio: 'inherit', 
+    cwd: process.cwd(),
+    env: { ...process.env, VITE_API_BASE_URL: API_URL }
+  });
 
   if (!fs.existsSync(distDir)) {
     console.error(`❌ Build directory not found: ${distDir}`);

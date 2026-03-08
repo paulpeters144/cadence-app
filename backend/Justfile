@@ -22,7 +22,7 @@ release:
 
 # Build for AWS Lambda (requires cargo-lambda)
 build-aws-lambda:
-    @$env:Path += ";$HOME\AppData\Roaming\Python\Python314\Scripts"; cargo lambda build --release --arm64 --features lambda --output-format zip
+    cargo lambda build --release --arm64 --features lambda --output-format zip
 
 # Run all tests
 test:

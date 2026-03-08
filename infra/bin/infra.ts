@@ -2,8 +2,9 @@ import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { InfraStack } from "../lib/infra-stack";
 import * as dotenv from "dotenv";
+import * as path from "path";
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 export interface StageCtx {
   stage: string;

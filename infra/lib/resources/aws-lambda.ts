@@ -22,6 +22,12 @@ export class AwsLambda {
       handler: "bootstrap", // Standard for Rust
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       memorySize: 512,
+      environment: {
+        JWT_SECRET: process.env.JWT_SECRET || "",
+        FRONTEND_URL: process.env.FRONTEND_URL || "",
+        TURSO_DATABASE_URL: process.env.TURSO_DATABASE_URL || "",
+        TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN || "",
+      },
     });
   }
 }
