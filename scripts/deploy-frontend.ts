@@ -5,6 +5,7 @@ import * as dotenv from 'dotenv';
 import { S3Client } from '@aws-sdk/client-s3';
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import { S3SyncClient } from 's3-sync-client';
+import * as mime from 'mime-types';
 
 // Load .env from the root
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -53,6 +54,9 @@ async function main() {
   // Sync dist directory to S3 (with del: true to remove old files)
   await syncClient.sync(distDir, `s3://${BUCKET_NAME}`, {
     del: true,
+    getS3Params: (localFile: string) => ({
+      ContentType: mime.lookup(localFile) || 'application/octet-stream'
+    })
   });
   console.log('✅ S3 Sync Complete.');
 

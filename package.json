@@ -19,9 +19,11 @@
     "@aws-sdk/client-cloudfront": "^3.1004.0",
     "@aws-sdk/client-lambda": "^3.1004.0",
     "@aws-sdk/client-s3": "^3.1004.0",
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^25.3.5",
     "concurrently": "^9.2.1",
     "dotenv": "^17.3.1",
+    "mime-types": "^3.0.2",
     "s3-sync-client": "^4.3.1",
     "tsx": "^4.21.0"
   }

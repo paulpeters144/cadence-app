@@ -68,15 +68,8 @@ pub fn app(state: AppState) -> Router {
     let frontend_url = env::var("FRONTEND_URL")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
 
-    let allowed_origins = [
-        "http://localhost:3000".parse::<HeaderValue>().unwrap(),
-        frontend_url
-            .parse::<HeaderValue>()
-            .expect("FRONTEND_URL is not a valid HeaderValue"),
-    ];
-
     let cors = CorsLayer::new()
-        .allow_origin(allowed_origins)
+        .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
