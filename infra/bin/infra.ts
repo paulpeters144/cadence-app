@@ -16,7 +16,7 @@ const context = app.node.tryGetContext(stage) as StageCtx;
 
 if (!context || !context.stage) {
   throw new Error(
-    "stage context or env is not set. Use -c stage=uat or -c stage=production",
+    "stage context or env is not set. Use -c stage=uat",
   );
 }
 

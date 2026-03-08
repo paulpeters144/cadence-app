@@ -23,7 +23,20 @@ async fn main() {
         router = app(state);
     }
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
-    println!("listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, router).await.unwrap();
+    #[cfg(not(feature = "lambda"))]
+    {
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
+        println!("listening on {}", listener.local_addr().unwrap());
+        axum::serve(listener, router).await.unwrap();
+    }
+
+    #[cfg(feature = "lambda")]
+    {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_target(false)
+            .without_time()
+            .init();
+        lambda_http::run(router).await.unwrap();
+    }
 }

@@ -22,9 +22,10 @@ release:
 
 # Build for AWS Lambda (requires cargo-lambda)
 build-aws-lambda:
-    cargo lambda build --release --arm64 --output-format binary
+    cargo lambda build --release --arm64 --features lambda --output-format binary
     if (!(Test-Path dist)) { New-Item -ItemType Directory dist }
     Copy-Item -Path target/lambda/backend/bootstrap -Destination dist/bootstrap -Force
+    Copy-Item -Path .env -Destination dist/.env -Force
 
 # Run all tests
 test:

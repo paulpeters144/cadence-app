@@ -12,8 +12,6 @@ This project contains the AWS CDK setup for the Cadence App.
 ## Commands
 - `pnpm run cdk:diff:uat`: See the infrastructure changes for UAT.
 - `pnpm run cdk:deploy:uat`: Deploy the infrastructure to UAT.
-- `pnpm run cdk:diff:prod`: See the infrastructure changes for Production.
-- `pnpm run cdk:deploy:prod`: Deploy the infrastructure to Production.
 
 ## Deployment Context
-The project uses CDK context to manage stages (`uat`, `production`). Use the `-c stage=...` flag if running CDK commands manually.
+The project uses CDK context to manage the `uat` stage. Use the `-c stage=uat` flag if running CDK commands manually.

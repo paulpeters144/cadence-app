@@ -6,9 +6,7 @@
   },
   "scripts": {
     "cdk:diff:uat": "cdk diff -c stage=uat",
-    "cdk:deploy:uat": "cdk deploy -c stage=uat",
-    "cdk:diff:prod": "cdk diff -c stage=production",
-    "cdk:deploy:prod": "cdk deploy -c stage=production"
+    "cdk:deploy:uat": "cdk deploy -c stage=uat"
   },
   "dependencies": {
     "aws-cdk-lib": "2.241.0",
