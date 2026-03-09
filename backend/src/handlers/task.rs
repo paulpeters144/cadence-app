@@ -112,7 +112,7 @@ pub async fn create_task(
         .create_task(&auth.username, list_id, &payload.title, payload.points)
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::ListNotFound => {
+            crate::manager::ManagerError::ListNotFound => {
                 AppError::NotFound("List not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to create task".to_string()),
@@ -176,7 +176,7 @@ pub async fn update_task(
         )
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::TaskNotFound => {
+            crate::manager::ManagerError::TaskNotFound => {
                 AppError::NotFound("Task not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to update task".to_string()),
@@ -216,7 +216,7 @@ pub async fn delete_task(
         .delete_task(&auth.username, list_id, task_id)
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::TaskNotFound => {
+            crate::manager::ManagerError::TaskNotFound => {
                 AppError::NotFound("Task not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to delete task".to_string()),
@@ -272,7 +272,7 @@ pub async fn move_task(
         )
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::TaskNotFound => {
+            crate::manager::ManagerError::TaskNotFound => {
                 AppError::NotFound("Task or list not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to move task".to_string()),
@@ -321,10 +321,10 @@ pub async fn reorder_tasks(
         .reorder_tasks(&auth.username, list_id, payload.active_id, payload.over_id)
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::TaskNotFound => {
+            crate::manager::ManagerError::TaskNotFound => {
                 AppError::NotFound("Task not found".to_string())
             }
-            crate::manager::app_manager::ManagerError::ListNotFound => {
+            crate::manager::ManagerError::ListNotFound => {
                 AppError::NotFound("List not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to reorder tasks".to_string()),

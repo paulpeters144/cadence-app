@@ -2,7 +2,7 @@ use crate::AppState;
 use crate::Domain;
 use crate::error::{AppError, ErrorResponse};
 use crate::handlers::util::auth::AuthenticatedUser;
-use crate::manager::app_manager::ManagerError;
+use crate::manager::ManagerError;
 use axum::{Json, extract::State};
 use axum_valid::Valid;
 use serde::{Deserialize, Serialize};

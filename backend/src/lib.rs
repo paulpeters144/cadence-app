@@ -11,12 +11,12 @@ use axum::{
     routing::{get, post},
 };
 use handlers::{health, list, task, user};
-use manager::app_manager::Manager;
+use manager::AppManager;
 use std::sync::Arc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-pub type AppState = Arc<dyn Manager>;
+pub type AppState = Arc<AppManager>;
 
 #[derive(OpenApi)]
 #[openapi(

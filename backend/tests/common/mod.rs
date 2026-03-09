@@ -4,7 +4,7 @@ use axum::{
     http::{Request, StatusCode},
 };
 use backend::{
-    AppState, access::AppRepository, app, manager::app_manager::AppManager,
+    AppState, access::AppRepository, app, manager::AppManager,
 };
 use http_body_util::BodyExt;
 use serde_json::{Value, json};

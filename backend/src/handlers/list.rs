@@ -186,10 +186,10 @@ pub async fn update_list(
         )
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::ListNotFound => {
+            crate::manager::ManagerError::ListNotFound => {
                 AppError::NotFound("List not found".to_string())
             }
-            crate::manager::app_manager::ManagerError::UserNotFound => {
+            crate::manager::ManagerError::UserNotFound => {
                 AppError::NotFound("User not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to update list".to_string()),
@@ -233,7 +233,7 @@ pub async fn delete_list(
         .delete_list(&auth.username, id)
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::ListNotFound => {
+            crate::manager::ManagerError::ListNotFound => {
                 AppError::NotFound("List not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to delete list".to_string()),
@@ -281,7 +281,7 @@ pub async fn duplicate_list(
         .duplicate_list(&auth.username, id, &payload.name)
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::ListNotFound => {
+            crate::manager::ManagerError::ListNotFound => {
                 AppError::NotFound("List not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to duplicate list".to_string()),
@@ -334,7 +334,7 @@ pub async fn reorder_lists(
         .reorder_lists(&auth.username, payload.active_id, payload.over_id)
         .await
         .map_err(|e| match e {
-            crate::manager::app_manager::ManagerError::ListNotFound => {
+            crate::manager::ManagerError::ListNotFound => {
                 AppError::NotFound("List not found".to_string())
             }
             _ => AppError::InternalServerError("Failed to reorder lists".to_string()),

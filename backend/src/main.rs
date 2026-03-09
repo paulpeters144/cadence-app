@@ -1,5 +1,5 @@
 use backend::access::AppRepository;
-use backend::manager::app_manager::AppManager;
+use backend::manager::AppManager;
 use backend::{AppState, app};
 use std::sync::Arc;
 
