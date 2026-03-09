@@ -1,27 +1,25 @@
-use axum::Router;
 use backend::access::AppRepository;
 use backend::manager::app_manager::AppManager;
 use backend::{AppState, app};
 use std::sync::Arc;
 
+async fn setup_state() -> AppState {
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not set in the environment");
+
+    let repo = AppRepository::new().await;
+    repo.init().await.expect("Failed to initialize database");
+
+    let user_repo = Arc::new(repo);
+    let app_manager = AppManager::new(user_repo, jwt_secret);
+    Arc::new(app_manager)
+}
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
 
-    let router: Router;
-    {
-        let jwt_secret =
-            std::env::var("JWT_SECRET").expect("JWT_SECRET not set in the environment");
-
-        let repo = AppRepository::new().await;
-        repo.init().await.expect("Failed to initialize database");
-
-        let user_repo = Arc::new(repo);
-        let app_manager = AppManager::new(user_repo, jwt_secret);
-        let state: AppState = Arc::new(app_manager);
-
-        router = app(state);
-    }
+    let state = setup_state().await;
+    let router = app(state);
 
     #[cfg(not(feature = "lambda"))]
     {

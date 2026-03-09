@@ -10,7 +10,7 @@ use axum::{
     Router,
     routing::{get, post},
 };
-use handlers::{list, task, user, health};
+use handlers::{health, list, task, user};
 use manager::app_manager::Manager;
 use std::sync::Arc;
 use utoipa::OpenApi;
@@ -62,21 +62,19 @@ pub struct ApiDoc;
 
 use tower_http::cors::{Any, CorsLayer};
 
-pub fn app(state: AppState) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
-
-    let openapi_doc = ApiDoc::openapi();
-
-    let mut router = Router::new()
-        .route(health::PATH_HEALTH, get(health::health))
+fn user_routes() -> Router<AppState> {
+    Router::new()
         .route(user::PATH_LOGIN, post(user::login))
         .route(user::PATH_REGISTER, post(user::register))
-        .route(user::PATH_ME, get(user::get_me));
+        .route(user::PATH_ME, get(user::get_me))
+}
 
-    router = router
+fn health_routes() -> Router<AppState> {
+    Router::new().route(health::PATH_HEALTH, get(health::health))
+}
+
+fn list_routes() -> Router<AppState> {
+    Router::new()
         .route(
             list::PATH_LISTS,
             post(list::create_list).get(list::get_lists),
@@ -86,9 +84,11 @@ pub fn app(state: AppState) -> Router {
             axum::routing::patch(list::update_list).delete(list::delete_list),
         )
         .route(list::PATH_LIST_DUPLICATE, post(list::duplicate_list))
-        .route(list::PATH_LISTS_REORDER, post(list::reorder_lists));
+        .route(list::PATH_LISTS_REORDER, post(list::reorder_lists))
+}
 
-    router = router
+fn task_routes() -> Router<AppState> {
+    Router::new()
         .route(
             task::PATH_TASKS,
             post(task::create_task).get(task::get_tasks),
@@ -98,10 +98,28 @@ pub fn app(state: AppState) -> Router {
             axum::routing::patch(task::update_task).delete(task::delete_task),
         )
         .route(task::PATH_TASKS_REORDER, post(task::reorder_tasks))
-        .route(task::PATH_TASK_MOVE, post(task::move_task));
+        .route(task::PATH_TASK_MOVE, post(task::move_task))
+}
 
-    router
-        .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", openapi_doc))
+fn swagger_routes() -> SwaggerUi {
+    let openapi_doc = ApiDoc::openapi();
+    SwaggerUi::new("/swagger").url("/api-docs/openapi.json", openapi_doc)
+}
+
+fn create_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+}
+
+pub fn app(state: AppState) -> Router {
+    Router::new()
+        .merge(user_routes())
+        .merge(health_routes())
+        .merge(list_routes())
+        .merge(task_routes())
+        .merge(swagger_routes())
         .with_state(state)
-        .layer(cors)
+        .layer(create_cors_layer())
 }

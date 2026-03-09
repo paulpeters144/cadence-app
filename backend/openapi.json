@@ -17,7 +17,14 @@
         "operationId": "health",
         "responses": {
           "200": {
-            "description": "Health check passed"
+            "description": "Health check passed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1080,6 +1087,21 @@
         ],
         "properties": {
           "message": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "build_date"
+        ],
+        "properties": {
+          "build_date": {
+            "type": "string"
+          },
+          "status": {
             "type": "string"
           }
         }

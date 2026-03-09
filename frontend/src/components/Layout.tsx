@@ -305,6 +305,12 @@ export default function Layout() {
 		return () => document.removeEventListener("keydown", down);
 	}, []);
 
+	useEffect(() => {
+		if (window.innerWidth < 1024) {
+			setIsSidebarOpen(false);
+		}
+	}, [location]);
+
 	const newListInputRef = useRef<HTMLInputElement>(null);
 
 	if (isUserLoading) {
@@ -435,7 +441,7 @@ export default function Layout() {
 							type="button"
 							onClick={() => setIsSidebarOpen(false)}
 							aria-label="Close sidebar"
-							className="fixed inset-0 bg-background/40 backdrop-blur-[2px] z-40 lg:hidden cursor-default"
+							className="fixed inset-0 bg-background/40 z-40 lg:hidden cursor-default"
 						/>
 						<aside className="fixed inset-y-0 left-0 z-50 lg:relative lg:inset-auto lg:z-0 border-r border-border/40 bg-sidebar overflow-hidden flex flex-col shadow-2xl lg:shadow-none w-[260px]">
 							<div className="p-6 flex flex-col gap-8 h-full">
