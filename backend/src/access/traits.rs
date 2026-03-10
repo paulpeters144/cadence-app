@@ -1,5 +1,7 @@
 use super::error::AccessError;
+use libsql::{Connection, Error, Rows, Transaction, params::IntoParams};
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateListParams {
@@ -18,19 +20,19 @@ pub struct UpdateTaskParams {
 }
 
 pub enum DbExecutor<'a> {
-    Connection(&'a libsql::Connection),
-    Transaction(&'a libsql::Transaction),
+    Connection(&'a Connection),
+    Transaction(&'a Transaction),
 }
 
 impl<'a> DbExecutor<'a> {
-    pub async fn query(&self, sql: &str, params: impl libsql::params::IntoParams) -> Result<libsql::Rows, libsql::Error> {
+    pub async fn query(&self, sql: &str, params: impl IntoParams) -> Result<Rows, Error> {
         match self {
             DbExecutor::Connection(c) => c.query(sql, params).await,
             DbExecutor::Transaction(t) => t.query(sql, params).await,
         }
     }
 
-    pub async fn execute(&self, sql: &str, params: impl libsql::params::IntoParams) -> Result<u64, libsql::Error> {
+    pub async fn execute(&self, sql: &str, params: impl IntoParams) -> Result<u64, Error> {
         match self {
             DbExecutor::Connection(c) => c.execute(sql, params).await,
             DbExecutor::Transaction(t) => t.execute(sql, params).await,
@@ -40,15 +42,12 @@ impl<'a> DbExecutor<'a> {
 
 pub trait DbQuery: Send + Sync {
     type Response;
-    
-    fn execute<'e>(
-        &self,
-        executor: &'e DbExecutor<'e>,
-    ) -> impl std::future::Future<Output = Result<Self::Response, AccessError>> + Send;
+
+    fn execute<'e>(&self, executor: &'e DbExecutor<'e>) -> impl Future<Output = Result<Self::Response, AccessError>> + Send;
 }
 
 pub trait TransactionalRepository: Send + Sync {
     fn begin_transaction(
         &self,
-    ) -> impl std::future::Future<Output = Result<libsql::Transaction, AccessError>> + Send;
+    ) -> impl Future<Output = Result<Transaction, AccessError>> + Send;
 }
