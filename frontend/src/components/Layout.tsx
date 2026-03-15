@@ -335,16 +335,7 @@ export default function Layout() {
 	};
 
 	const handleDuplicateList = (id: string, name: string) => {
-		// Logic to find the next available incrementing number
-		const baseName = name.replace(/\s\d+$/, "");
-		const existingNumbers = lists
-			.filter((l) => l.name.startsWith(baseName))
-			.map((l) => {
-				const match = l.name.match(/\s(\d+)$/);
-				return match ? parseInt(match[1], 10) : 0;
-			});
-		const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
-		const newName = `${baseName} ${nextNumber}`;
+		const newName = `${name} copy`;
 
 		duplicateListMutation.mutate({ id, newName });
 	};
@@ -433,7 +424,7 @@ export default function Layout() {
 			onDragStart={handleDragStart}
 			onDragEnd={handleDragEnd}
 		>
-			<div className="flex min-h-screen bg-background text-foreground font-sans antialiased selection:bg-primary/10">
+			<div className="flex h-screen overflow-hidden bg-background text-foreground font-sans antialiased selection:bg-primary/10">
 				{/* Sidebar */}
 				{isSidebarOpen && (
 					<>

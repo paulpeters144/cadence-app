@@ -47,7 +47,5 @@ pub trait DbQuery: Send + Sync {
 }
 
 pub trait TransactionalRepository: Send + Sync {
-    fn begin_transaction(
-        &self,
-    ) -> impl Future<Output = Result<Transaction, AccessError>> + Send;
+    fn begin_transaction(&self) -> impl Future<Output = Result<Transaction, AccessError>> + Send;
 }
